@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Transcritor de Reunião</title>
+<style>
+  /* Layout: coluna única de celular; controle grande no topo, texto ao vivo no meio, ações de saída embaixo. */
+  :root {
+    --bg: #f3f5f8; --fg: #14202e; --muted: #5a6b7d; --card: #ffffff; --line: #d5dce5;
+    --accent: #1b4f9c; --accent-fg: #ffffff; --rec: #c0392b; --ok: #1f7a4d; --warn: #9a6200;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0e151d; --fg: #e6edf5; --muted: #93a3b5; --card: #172230; --line: #2a3a4d;
+      --accent: #6fa3ec; --accent-fg: #08121f; --rec: #ff6b5b; --ok: #4cc58a; --warn: #e0a84a; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding-inline: 16px; padding-block: max(16px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-bottom)); }
+  main { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  h1 { font-size: 1.25rem; margin: 0; }
+  .sub { color: var(--muted); font-size: .875rem; margin: 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .painel { display: flex; flex-direction: column; gap: 12px; }
+  .estado { display: flex; align-items: center; gap: 10px; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+  .ponto { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); flex: none; }
+  .gravando .ponto { background: var(--rec); animation: pulsa 1.2s infinite; }
+  @keyframes pulsa { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .gravando .ponto { animation: none; } }
+  .tempo { font-size: 1.5rem; font-weight: 700; }
+  .meta { color: var(--muted); font-size: .875rem; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--fg);
+    border-radius: 10px; padding: 12px 14px; min-height: 48px; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  button.principal { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 700; font-size: 1.1rem; min-height: 56px; }
+  .gravando button.principal { background: var(--rec); border-color: var(--rec); color: #fff; }
+  .grade { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grade .largo { grid-column: 1 / -1; }
+  #texto { max-height: 46vh; overflow-y: auto; min-height: 9rem; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
+  .linha { margin: 0 0 8px; }
+  .hora { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .8125rem; margin-right: 6px; }
+  .parcial { color: var(--muted); font-style: italic; }
+  .vazio { color: var(--muted); }
+  #aviso { font-size: .9rem; min-height: 1.4em; margin: 0; }
+  #aviso.erro { color: var(--rec); } #aviso.ok { color: var(--ok); } #aviso.atencao { color: var(--warn); }
+  .confirma { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  ul.notas { margin: 0; padding-left: 1.2rem; color: var(--muted); font-size: .875rem; }
+</style>
+</head>
+<body>
+<main id="raiz">
+  <header>
+    <h1>Transcritor de Reunião</h1>
+    <p class="sub">Só texto: o áudio não é gravado nem guardado. O texto fica neste aparelho.</p>
+  </header>
+
+  <section class="card painel" aria-label="Controle">
+    <div class="estado">
+      <span class="ponto" aria-hidden="true"></span>
+      <span class="tempo" id="tempo">00:00:00</span>
+      <span class="meta" id="estado">Parado</span>
+      <span class="meta" id="palavras">0 palavras</span>
+    </div>
+    <button class="principal" id="btnIniciar" type="button">Iniciar transcrição</button>
+    <p id="aviso" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="card" aria-label="Texto">
+    <div id="texto" tabindex="0"><span class="vazio">O texto aparece aqui enquanto a reunião acontece.</span></div>
+  </section>
+
+  <section class="card painel" aria-label="Saída">
+    <div class="grade">
+      <button class="largo principal" id="btnClaude" type="button">Copiar com instruções para o Claude</button>
+      <button id="btnTexto" type="button">Copiar só o texto</button>
+      <button id="btnCompartilhar" type="button">Compartilhar</button>
+      <button id="btnBaixar" type="button">Baixar .txt</button>
+      <button id="btnLimpar" type="button">Limpar</button>
+    </div>
+    <div class="confirma" id="confirma" hidden>
+      <span>Apagar todo o texto deste aparelho?</span>
+      <button id="btnSim" type="button">Sim, apagar</button>
+      <button id="btnNao" type="button">Cancelar</button>
+    </div>
+  </section>
+
+  <ul class="notas">
+    <li>Deixe a tela ligada e este navegador aberto durante a reunião.</li>
+    <li>O Chrome envia o áudio aos servidores do Google para reconhecer a fala. Avise os participantes.</li>
+    <li>Ao final, toque em "Copiar com instruções para o Claude" e cole no app do Claude.</li>
+  </ul>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var CHAVE = "transcritor_reuniao_v1";
+  var PROMPT = [
+    "Abaixo está a transcrição bruta de uma reunião presencial, gerada por reconhecimento de voz. Não há identificação de quem fala. Faça um ETL completo e entregue um documento organizado.",
+    "",
+    "1) CORREÇÃO DE PORTUGUÊS (obrigatória): todo o texto deve sair em português do Brasil corrigido gramaticalmente e ortograficamente (acentuação, crase, concordância, regência, pontuação, maiúsculas). A fala oral vira escrita clara, sem mudar o sentido. Corrija erros evidentes de reconhecimento de voz (palavras trocadas, nomes, siglas) usando o contexto. Se algo estiver ambíguo, marque \"(trecho incerto)\". Não invente fatos nem atribua falas por suposição.",
+    "",
+    "2) ORGANIZAÇÃO: remova vícios de fala, repetições e conversa paralela. Agrupe por assunto.",
+    "",
+    "3) DOCUMENTO FINAL, com as seções:",
+    "- Cabeçalho (título, data, duração aproximada, participantes citados)",
+    "- Resumo executivo (até 8 linhas)",
+    "- Decisões tomadas",
+    "- Pendências e próximos passos (tabela: ação | responsável | prazo)",
+    "- Tópicos discutidos (um bloco por assunto)",
+    "- Números, datas, nomes e valores citados",
+    "- Dúvidas em aberto e trechos incertos",
+    "- Glossário (se houver termos técnicos)",
+    "",
+    "4) Antes de entregar, releia tudo procurando erros de português e corrija.",
+    "",
+    "Transcrição:"
+  ].join("\n");
+
+  var $ = function (id) { return document.getElementById(id); };
+  var raiz = $("raiz"), elTexto = $("texto"), elTempo = $("tempo"), elEstado = $("estado"),
+      elPalavras = $("palavras"), elAviso = $("aviso"), btnIniciar = $("btnIniciar");
+
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var estado = { linhas: [], decorrido: 0 };   // linhas: {t: segundos, s: texto}
+  var rec = null, rodando = false, parcial = "", ultimoFinal = "";
+  var inicioSessao = 0, base = 0, relogio = null, wake = null, reinicios = 0;
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function hhmmss(s) { s = Math.floor(s); return pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s % 3600 / 60)) + ":" + pad(s % 60); }
+  function aviso(msg, tipo) { elAviso.textContent = msg || ""; elAviso.className = tipo || ""; }
+
+  function salvar() { try { localStorage.setItem(CHAVE, JSON.stringify(estado)); } catch (e) {} }
+  function carregar() {
+    try {
+      var d = JSON.parse(localStorage.getItem(CHAVE) || "null");
+      if (d && Array.isArray(d.linhas)) { estado = { linhas: d.linhas, decorrido: +d.decorrido || 0 }; }
+    } catch (e) {}
+  }
+
+  function textoPuro() {
+    return estado.linhas.map(function (l) { return "[" + hhmmss(l.t) + "] " + l.s; }).join("\n");
+  }
+  function contarPalavras() {
+    return estado.linhas.reduce(function (n, l) { return n + l.s.split(/\s+/).filter(Boolean).length; }, 0);
+  }
+
+  function desenhar() {
+    elTexto.textContent = "";
+    if (!estado.linhas.length && !parcial) {
+      var v = document.createElement("span"); v.className = "vazio";
+      v.textContent = "O texto aparece aqui enquanto a reunião acontece.";
+      elTexto.appendChild(v);
+    }
+    estado.linhas.forEach(function (l) {
+      var p = document.createElement("p"); p.className = "linha";
+      var h = document.createElement("span"); h.className = "hora"; h.textContent = hhmmss(l.t);
+      p.appendChild(h); p.appendChild(document.createTextNode(l.s));
+      elTexto.appendChild(p);
+    });
+    if (parcial) {
+      var q = document.createElement("p"); q.className = "linha parcial"; q.textContent = parcial;
+      elTexto.appendChild(q);
+    }
+    elTexto.scrollTop = elTexto.scrollHeight;
+    var n = contarPalavras();
+    elPalavras.textContent = n + (n === 1 ? " palavra" : " palavras");
+  }
+
+  function segundosAgora() { return base + (rodando ? (Date.now() - inicioSessao) / 1000 : 0); }
+  function tick() { elTempo.textContent = hhmmss(segundosAgora()); }
+
+  function adicionarFinal(txt) {
+    txt = txt.replace(/\s+/g, " ").trim();
+    if (!txt || txt === ultimoFinal) return;          // evita repetição comum no Chrome do Android
+    ultimoFinal = txt;
+    estado.linhas.push({ t: segundosAgora(), s: txt.charAt(0).toUpperCase() + txt.slice(1) });
+    estado.decorrido = segundosAgora();
+    salvar();
+  }
+
+  function criarRec() {
+    var r = new SR();
+    r.lang = "pt-BR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    r.onresult = function (ev) {
+      var interino = "";
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        var res = ev.results[i];
+        if (res.isFinal) { adicionarFinal(res[0].transcript); }
+        else { interino += res[0].transcript; }
+      }
+      parcial = interino.trim();
+      desenhar();
+    };
+    r.onerror = function (ev) {
+      if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
+        aviso("Microfone bloqueado. Permita o microfone para este site nas configurações do navegador.", "erro");
+        parar(true);
+      } else if (ev.error === "audio-capture") {
+        aviso("Nenhum microfone encontrado.", "erro"); parar(true);
+      } else if (ev.error === "network") {
+        aviso("Sem internet para reconhecer a fala. Tentando de novo...", "atencao");
+      }
+      /* no-speech e aborted: o onend reinicia sozinho */
+    };
+    r.onend = function () {
+      if (parcial) { adicionarFinal(parcial); parcial = ""; desenhar(); }
+      if (rodando) {
+        reinicios++;
+        setTimeout(function () { if (rodando) { try { r.start(); } catch (e) {} } }, 250);
+      }
+    };
+    return r;
+  }
+
+  async function pedirTelaLigada() {
+    try { if (navigator.wakeLock) { wake = await navigator.wakeLock.request("screen"); } } catch (e) { wake = null; }
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (rodando && document.visibilityState === "visible") { pedirTelaLigada(); }
+    if (rodando && document.visibilityState === "hidden") {
+      aviso("A tela foi desligada ou o navegador saiu do primeiro plano: a transcrição pode ter parado.", "atencao");
+    }
+  });
+
+  function iniciar() {
+    if (!SR) { aviso("Este navegador não tem reconhecimento de voz. Use o Chrome no Android.", "erro"); return; }
+    base = estado.decorrido; inicioSessao = Date.now(); ultimoFinal = ""; parcial = "";
+    rec = criarRec(); rodando = true;
+    try { rec.start(); } catch (e) { aviso("Não foi possível iniciar o microfone.", "erro"); rodando = false; return; }
+    pedirTelaLigada();
+    relogio = setInterval(tick, 500);
+    raiz.classList.add("gravando");
+    btnIniciar.textContent = "Parar transcrição";
+    elEstado.textContent = "Ouvindo";
+    aviso("Transcrevendo. Mantenha a tela ligada.", "ok");
+  }
+
+  function parar(porErro) {
+    if (rodando) { estado.decorrido = segundosAgora(); }
+    rodando = false;
+    clearInterval(relogio);
+    try { if (rec) rec.stop(); } catch (e) {}
+    try { if (wake) wake.release(); } catch (e) {}
+    wake = null;
+    if (parcial) { adicionarFinal(parcial); parcial = ""; }
+    salvar(); desenhar(); tick();
+    raiz.classList.remove("gravando");
+    btnIniciar.textContent = estado.linhas.length ? "Retomar transcrição" : "Iniciar transcrição";
+    elEstado.textContent = "Parado";
+    if (!porErro) aviso("Parado. O texto está salvo neste aparelho.", "ok");
+  }
+
+  btnIniciar.addEventListener("click", function () { rodando ? parar(false) : iniciar(); });
+
+  async function copiar(txt, okMsg) {
+    try { await navigator.clipboard.writeText(txt); aviso(okMsg, "ok"); }
+    catch (e) {
+      var ta = document.createElement("textarea"); ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      var ok = false; try { ok = document.execCommand("copy"); } catch (e2) {}
+      document.body.removeChild(ta);
+      aviso(ok ? okMsg : "Não consegui copiar. Use Baixar .txt.", ok ? "ok" : "erro");
+    }
+  }
+  function haTexto() { if (!estado.linhas.length) { aviso("Ainda não há texto.", "atencao"); return false; } return true; }
+
+  $("btnClaude").addEventListener("click", function () {
+    if (!haTexto()) return;
+    var cab = "Data da reunião: " + new Date().toLocaleDateString("pt-BR") + " · Duração aproximada: " + hhmmss(estado.decorrido) + "\n\n";
+    copiar(PROMPT + "\n\n" + cab + textoPuro(), "Copiado. Abra o app do Claude e cole.");
+  });
+  $("btnTexto").addEventListener("click", function () { if (haTexto()) copiar(textoPuro(), "Texto copiado."); });
+  $("btnCompartilhar").addEventListener("click", async function () {
+    if (!haTexto()) return;
+    if (navigator.share) { try { await navigator.share({ title: "Transcrição da reunião", text: textoPuro() }); } catch (e) {} }
+    else { copiar(textoPuro(), "Compartilhar não existe aqui. Texto copiado."); }
+  });
+  $("btnBaixar").addEventListener("click", function () {
+    if (!haTexto()) return;
+    var d = new Date(), nome = "reuniao_" + d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes()) + ".txt";
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([textoPuro() + "\n"], { type: "text/plain;charset=utf-8" }));
+    a.download = nome; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+  });
+  $("btnLimpar").addEventListener("click", function () { if (rodando) { aviso("Pare a transcrição antes de limpar.", "atencao"); return; } $("confirma").hidden = false; });
+  $("btnNao").addEventListener("click", function () { $("confirma").hidden = true; });
+  $("btnSim").addEventListener("click", function () {
+    estado = { linhas: [], decorrido: 0 }; salvar(); $("confirma").hidden = true;
+    btnIniciar.textContent = "Iniciar transcrição"; desenhar(); tick(); aviso("Texto apagado.", "ok");
+  });
+
+  carregar(); desenhar(); tick();
+  if (estado.linhas.length) { btnIniciar.textContent = "Retomar transcrição"; aviso("Texto anterior recuperado deste aparelho.", "atencao"); }
+  if (!SR) { aviso("Este navegador não tem reconhecimento de voz. Abra no Chrome do Android.", "erro"); }
+})();
+</script>
+</body>
+</html>
