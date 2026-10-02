@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Manual do Transcritor</title>
+<style>
+  :root { --bg:#f3f5f8; --fg:#14202e; --muted:#5a6b7d; --card:#fff; --line:#d5dce5; --accent:#1b4f9c; --warn:#9a6200; --ok:#1f7a4d; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e151d; --fg:#e6edf5; --muted:#93a3b5; --card:#172230; --line:#2a3a4d; --accent:#6fa3ec; --warn:#e0a84a; --ok:#4cc58a; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding:16px; }
+  main { max-width:760px; margin:0 auto; display:flex; flex-direction:column; gap:16px; }
+  h1 { font-size:1.5rem; margin:0; } h2 { font-size:1.2rem; margin:0 0 8px; color:var(--accent); } h3 { font-size:1rem; margin:14px 0 4px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  p { margin:0 0 8px; } ol, ul { margin:0 0 8px; padding-left:1.3rem; } li { margin-bottom:4px; }
+  .sub { color:var(--muted); }
+  .aviso { border-left:4px solid var(--warn); padding:6px 10px; background:rgba(154,98,0,.08); margin:8px 0; }
+  .ok { border-left:4px solid var(--ok); padding:6px 10px; background:rgba(31,122,77,.08); margin:8px 0; }
+  table { border-collapse:collapse; width:100%; font-size:.92rem; } th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+  code { background:rgba(127,127,127,.15); padding:1px 5px; border-radius:4px; }
+  a { color:var(--accent); }
+  .botao { display:inline-block; padding:12px 18px; background:var(--accent); color:#fff; border-radius:10px; font-weight:700; text-decoration:none; }
+  @media print { body { background:#fff; color:#000; } section { break-inside:avoid; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Manual do Transcritor de Reunião</h1>
+    <p class="sub">Passo a passo para transcrever reuniões em texto, de graça, sem gravar áudio e sem chave de API.</p>
+    <p><a class="botao" href="./">Abrir o Transcritor</a></p>
+  </header>
+
+  <section>
+    <h2>1. O que é</h2>
+    <p>Uma página da internet que ouve a fala (pelo microfone ou pelo áudio do computador) e escreve em texto, em tempo real, em <b>português do Brasil</b> ou <b>inglês</b>. <b>O áudio nunca é gravado nem guardado</b>: só o texto fica salvo no seu aparelho. Depois você pode pedir ao Claude um resumo, ata, mapa mental, tarefas ou fazer perguntas sobre a reunião.</p>
+    <div class="aviso"><b>Aviso importante:</b> o motor "Chrome" envia o áudio aos servidores do Google para reconhecer a fala. O motor "Whisper local" não envia nada. Avise os participantes de que a reunião está sendo transcrita.</div>
+  </section>
+
+  <section>
+    <h2>2. O que você precisa</h2>
+    <ul>
+      <li><b>Chrome</b> (ou Edge) no celular Android ou no computador. Safari/Firefox não servem para o motor Chrome.</li>
+      <li>Internet (para o motor Chrome e para baixar o modelo do Whisper na primeira vez).</li>
+      <li>Permitir o <b>microfone</b> quando o navegador pedir.</li>
+    </ul>
+    <p>Dica: no celular, toque em ⋮ → <b>Adicionar à tela inicial</b> para abrir como se fosse um aplicativo.</p>
+  </section>
+
+  <section>
+    <h2>3. Qual combinação usar</h2>
+    <table>
+      <tr><th>Situação</th><th>Onde</th><th>Fonte</th><th>Motor</th></tr>
+      <tr><td>Reunião presencial</td><td>Celular ou computador</td><td>Microfone</td><td>Chrome (rápido)</td></tr>
+      <tr><td>Chamada telefônica</td><td>Celular</td><td>Microfone, chamada no viva-voz</td><td>Chrome</td></tr>
+      <tr><td>Reunião online (Meet, Zoom, Teams no navegador)</td><td>Computador</td><td>Computador + meu microfone</td><td>Whisper local</td></tr>
+      <tr><td>Vídeo ou aula que está tocando</td><td>Computador</td><td>Áudio do computador</td><td>Whisper local</td></tr>
+      <tr><td>Privacidade máxima</td><td>Computador</td><td>Qualquer</td><td>Whisper local</td></tr>
+    </table>
+    <div class="aviso">O celular <b>não consegue</b> capturar o áudio interno (limite do navegador). Só o microfone, com o som da chamada no alto-falante.</div>
+  </section>
+
+  <section>
+    <h2>4. Transcrever uma reunião (passo a passo)</h2>
+    <ol>
+      <li>Abra a página. Escolha o <b>Idioma</b> (Português ou English).</li>
+      <li>Escolha <b>De onde vem o áudio</b> e o <b>Motor</b> (veja a tabela acima).</li>
+      <li>Toque em <b>Iniciar transcrição</b>. Permita o microfone se o navegador perguntar.</li>
+      <li>Fale. O texto aparece na caixa do meio. Em cinza itálico é o que ainda está sendo reconhecido.</li>
+      <li><b>Deixe a tela ligada</b> e o navegador aberto. Se a tela apagar, o Chrome pode parar de ouvir.</li>
+      <li>Ao terminar, toque em <b>Parar transcrição</b>. O texto fica salvo. Para continuar depois, toque em <b>Retomar</b>.</li>
+    </ol>
+    <p>Cada trecho tem o horário (hh:mm:ss) desde o início da reunião.</p>
+  </section>
+
+  <section>
+    <h2>5. Capturar o áudio do computador</h2>
+    <ol>
+      <li>Abra a reunião ou o vídeo em outra aba do Chrome.</li>
+      <li>No Transcritor, escolha <b>Áudio do computador</b> (ou <b>Computador + meu microfone</b>, se também quiser sua voz). O motor muda sozinho para Whisper local.</li>
+      <li>Toque em <b>Iniciar</b>. Abre uma janela do navegador pedindo o que compartilhar.</li>
+      <li>Escolha <b>Aba do Chrome</b>, selecione a aba da reunião e <b>marque "Compartilhar áudio da aba"</b>. Sem essa caixa marcada não há áudio e a página avisa.</li>
+      <li>Toque em <b>Compartilhar</b>. Volte para a aba do Transcritor (ou deixe aberta em outra janela).</li>
+    </ol>
+    <p>No <b>Windows</b> também dá para escolher "Tela inteira" e marcar "Compartilhar áudio do sistema", que captura tudo que toca no computador. No Linux e no Mac só funciona o áudio de uma aba.</p>
+    <p>Para encerrar, toque em Parar no Transcritor (ou em "Parar compartilhamento" na barra do Chrome).</p>
+  </section>
+
+  <section>
+    <h2>6. O motor Whisper local</h2>
+    <ul>
+      <li>Na <b>primeira vez</b> baixa um modelo de voz (~80 MB). Aparece "Baixando modelo de voz: X%". Depois fica guardado pelo navegador.</li>
+      <li>O texto aparece <b>alguns segundos depois</b> da fala, por trechos, e não palavra por palavra.</li>
+      <li>Funciona dentro do navegador: o áudio não sai do seu computador e é descartado logo após virar texto.</li>
+      <li>Em computador fraco pode ficar atrasado. A página avisa; nesse caso use o motor Chrome (só microfone).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>7. Durante a reunião</h2>
+    <ul>
+      <li><b>★ Marcar momento:</b> insere uma marca no horário atual. Útil para achar depois "aquela decisão".</li>
+      <li><b>Marcar uma fala:</b> toque na fala para pôr ★ (toque de novo para tirar).</li>
+      <li><b>+ Nota digitada:</b> escreva uma anotação sua, que entra na linha do tempo e vai para o resumo.</li>
+      <li><b>Quem está falando:</b> em <i>Glossário → Nomes de falantes</i> adicione os nomes. Depois toque no nome na tela "Quem está falando" e as falas seguintes ficam com ele. Para corrigir uma fala, toque no nome ao lado dela. É manual: a página não reconhece vozes sozinha.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>8. Glossário (corrigir nomes e termos)</h2>
+    <p>Abra <b>Glossário</b> e escreva uma regra por linha, no formato <code>errado = certo</code>:</p>
+    <p><code>cloude = Claude</code><br><code>kiwi fai = Kiwify</code></p>
+    <p>Toque em <b>Salvar glossário</b>. Vale para o texto novo; use <b>Aplicar na reunião aberta</b> para corrigir o que já foi transcrito.</p>
+  </section>
+
+  <section>
+    <h2>9. Resumo, ata, mapa mental e perguntas (com o Claude)</h2>
+    <p>Não precisa de chave nem de custo extra: a página prepara o pedido e você cola no app do Claude.</p>
+    <ol>
+      <li>Em <b>Modelo</b>, escolha: <i>Ata completa</i>, <i>Resumo executivo</i>, <i>Chamada de vendas</i>, <i>Entrevista</i>, <i>Aula</i>, <i>Mapa mental</i>, <i>Só tarefas e decisões</i>, <i>Perguntar à reunião</i> ou <i>Só a transcrição limpa</i>.</li>
+      <li>Se escolher "Perguntar à reunião", escreva a pergunta na caixa que aparece.</li>
+      <li>Toque em <b>Copiar com instruções para o Claude</b>.</li>
+      <li>Abra o app do Claude, cole e envie. O Claude devolve o documento pronto, já com o português corrigido.</li>
+    </ol>
+    <div class="ok">Para vários resultados da mesma reunião (ata + tarefas + mapa mental), repita os passos com outro modelo.</div>
+  </section>
+
+  <section>
+    <h2>10. Salvar e compartilhar o texto</h2>
+    <table>
+      <tr><th>Botão</th><th>O que faz</th></tr>
+      <tr><td>Copiar só o texto</td><td>Copia a transcrição com horários.</td></tr>
+      <tr><td>Compartilhar</td><td>Abre o menu do celular (WhatsApp, e-mail...).</td></tr>
+      <tr><td>Baixar .txt / .md</td><td>Texto simples / Markdown.</td></tr>
+      <tr><td>Baixar .srt</td><td>Legenda com tempos, para vídeo.</td></tr>
+      <tr><td>Baixar Word (.doc)</td><td>Abre no Word e no Google Docs.</td></tr>
+      <tr><td>PDF</td><td>Abre a impressão; escolha "Salvar como PDF".</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>11. Minhas reuniões</h2>
+    <ul>
+      <li><b>Nova reunião:</b> cria uma reunião vazia (pare a transcrição antes).</li>
+      <li><b>Abrir / Renomear:</b> troque de reunião e dê nomes fáceis.</li>
+      <li><b>Buscar:</b> procura uma palavra em todas as reuniões e mostra os trechos.</li>
+      <li><b>Mesclar na aberta:</b> junta uma reunião à que está aberta (útil se a transcrição foi interrompida).</li>
+      <li><b>Apagar:</b> vai para a <b>Lixeira</b>, de onde dá para restaurar ou excluir de vez.</li>
+    </ul>
+    <div class="aviso">O texto fica guardado <b>só neste navegador e neste aparelho</b>. Limpar os dados do navegador apaga tudo. Exporte ou copie o que for importante.</div>
+  </section>
+
+  <section>
+    <h2>12. Problemas comuns</h2>
+    <table>
+      <tr><th>Sintoma</th><th>Solução</th></tr>
+      <tr><td>"Microfone bloqueado"</td><td>Toque no cadeado ao lado do endereço → Permissões → Microfone → Permitir. Recarregue.</td></tr>
+      <tr><td>Parou sozinho / texto não aparece</td><td>Tela desligou ou o Chrome foi para segundo plano. Mantenha a tela ligada e toque em Retomar.</td></tr>
+      <tr><td>"Nenhum áudio foi compartilhado"</td><td>Refaça o passo da seção 5 e marque "Compartilhar áudio da aba".</td></tr>
+      <tr><td>Texto repetido ou palavras erradas</td><td>Fale mais perto do microfone, reduza o ruído e use o glossário.</td></tr>
+      <tr><td>Whisper lento ou "atrasada"</td><td>Use o motor Chrome para microfone, ou feche outras abas pesadas.</td></tr>
+      <tr><td>"Falha no Whisper" / não baixa o modelo</td><td>Verifique a internet e recarregue a página. Se persistir, anote a mensagem exata e peça ajuda.</td></tr>
+      <tr><td>No celular, opções de computador desativadas</td><td>É normal: o celular só captura o microfone.</td></tr>
+      <tr><td>Fala em outro idioma sai errada</td><td>Troque o Idioma antes de iniciar (não dá para trocar no meio).</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>13. O que esta ferramenta não faz</h2>
+    <ul>
+      <li>Não grava nem guarda áudio.</li>
+      <li>Não identifica sozinha quem está falando (a marcação é manual).</li>
+      <li>Não grava ligações do celular por dentro (só pelo microfone, no viva-voz).</li>
+      <li>Não captura áudio interno no celular.</li>
+      <li>Só português do Brasil e inglês.</li>
+      <li>Não gera o resumo sozinha: ela prepara o pedido e o Claude responde.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>14. Atalho: roteiro de 1 minuto</h2>
+    <ol>
+      <li>Abra a página no Chrome e escolha idioma, fonte e motor.</li>
+      <li>Iniciar, deixe a reunião rolar e depois Parar.</li>
+      <li>Escolha o modelo, copie para o Claude e cole no app do Claude.</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>

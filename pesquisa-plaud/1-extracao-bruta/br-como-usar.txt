@@ -1,0 +1,149 @@
+Como usar
+A marca nmero 1 no mundo de gravadores de I.A.
+-->
+Plaud NotePin
+Acessrios
+Sobre ns
+0
+Digite o que procura e pressione a tecla
+Enviar
+para visualizar todos os resultados.
+Meu carrinho
+×
+Seu carrinho est vazio.
+Para continuar comprando, navegue pelo menu do site, faa uma busca pelo seu produto ou clique no boto abaixo.
+Escolher produtos
+Meus pedidos
+Fale conosco
+Como
+usar
+1. O que vem na caixa?
+Aps desembalar, veja o que voc encontrar na caixa do PLAUD Note e do NotePin:
+PLAUD Note
+1x PLAUD Note
+1x estojo MagSafe
+1x Cabo de carregamento
+1x Anel MagSafe
+1x Guia de Incio Rpido
+PLAUD NotePin:
+1x dispositivo NotePin
+1x pino magntico
+1x clipe
+1x Cordo
+1x Pulseira
+1x base de carregamento
+1x cabo de carregamento USB-C
+1x Guia de incio rpido
+2. Componentes principais
+PLAUD Note:
+Luz indicadora
+Interruptor do modo de gravao
+Boto de gravao
+Porta de carregamento
+Nota: Quando voc pressiona o boto de gravao no novo PLAUD Note (que ainda no est vinculado ao PLAUD APP),  normal que a luz branca continue piscando. Vincule o dispositivo ao PLAUD APP antes de us-lo.
+Luz Indicadora Microfone 1
+Microfone 2
+Slot para cordo
+Pino magntico
+Observao: vincule o dispositivo ao aplicativo PLAUD antes de us-lo.
+3. Carregando o dispositivo
+A caixa do pacote do PLAUD Note inclui um cabo de carregamento especial. Para carregar o dispositivo, siga estas etapas:
+Conecte o cabo de carregamento  porta de carregamento do PLAUD Note.
+Conecte a outra extremidade do cabo a um adaptador de energia compatvel.
+Importante:
+Use um adaptador de energia que produza pelo menos 0,5 A e diga "DC-5 V" na etiqueta. Usar um adaptador diferente pode danificar o dispositivo.
+Evite carregar o dispositivo atravs de uma porta USB do computador ou usar cabos de carregamento no originais ou similares de outras marcas.
+O PLAUD Note no pode ser carregado sem fio neste momento.
+Retire o pino magntico do NotePin.
+Coloque o NotePin na base de carregamento.
+Conecte o cabo de carregamento Tipo C na base de carregamento.
+4. Baixe o aplicativo PLAUD
+Clique
+aqui
+para seguir o guia sobre como baixar o aplicativo PLAUD.
+Observao:
+A configurao de idioma do PLAUD APP  ajustada automaticamente com base na configurao de idioma do telefone. Ele suporta ingls, japons, coreano, francs, alemo, espanhol, portugus, italiano, chins tradicional e chins simplificado.
+Se voc no conseguir instalar seu App, verifique a verso do seu telefone. A verso do sistema deve atender aos requisitos abaixo:
+Android: Android 6 ou superior.
+iPhone: iOS12 ou superior.
+5. Crie uma conta
+Voc pode escolher fazer login no aplicativo PLAUD diretamente da sua conta Google ou Apple existente ou criar uma conta PLAUD por e-mail. Aqui esto os passos:
+1. Faa login com sua conta existente do Google ou da Apple:
+Clique em "Continuar com o Google" ou "Continuar com a Apple" e siga as instrues na tela para fazer login diretamente no aplicativo.
+2. Crie uma conta via e-mail:
+Digite "Continuar com e-mail" para clicar em "Inscrever-se" e criar uma conta.
+Insira seu endereo de e-mail (certifique-se de que esteja escrito corretamente) e crie uma senha com 6 a 16 caracteres, incluindo letras maisculas e minsculas e pelo menos um nmero (sem espaos). Em seguida, clique em "Registro de conta" para obter um cdigo de verificao.
+Digite o cdigo de verificao para comear.
+6. Vincule seu dispositivo
+Depois de criar sua conta PLAUD e efetuar login com sucesso, siga estas etapas para vincular seu dispositivo:
+Abra o aplicativo PLAUD e clique no boto "Conectar" localizado no canto superior esquerdo.
+Selecione seu dispositivo PLAUD, ento pressione e segure o boto de gravao no dispositivo at que a luz branca pisque. Isso indica que o dispositivo est pronto para conexo.
+Ento, o aplicativo procura o dispositivo. Assim que o dispositivo aparecer na lista de dispositivos, voc pode se conectar a ele.
+7. Como iniciar uma gravao
+Pressione e segure para iniciar e parar a gravao:
+1 Vibrao: A gravao inicia.
+2 Vibraes: A gravao  interrompida.
+Para iniciar uma gravao de nota:
+Alterne o boto de gravao para o modo de gravao de notas.
+Pressione longamente o boto Gravar e segure-o por 1 segundo at sentir 1 vibrao, indicando que a gravao comeou.
+Pressione longamente o boto Gravar e segure-o por 1 segundo at sentir 2 vibraes, indicando que a gravao terminou.
+Para iniciar uma gravao de chamada telefnica:
+Alterne o boto de gravao para o modo de gravao de chamadas telefnicas.
+8. Transcrio
+Aps terminar a gravao, o udio ser salvo no seu dispositivo automaticamente.
+Para fazer uma transcrio:
+Conecte seu dispositivo PLAUD ao APLICATIVO PLAUD.
+Seus arquivos de udio sero enviados automaticamente aps uma conexo bem-sucedida.
+Clique em "Gerar", selecione um modelo de resumo e escolha o idioma de gravao para gerar a transcrio.
+9. Resumo e mapa mental
+Aps a concluso da transcrio, o resumo e o mapa mental so gerados automaticamente.
+Observao: se o udio for muito curto (menos de 30 segundos), o resumo poder no ser gerado.
+10. Gerenciamento de arquivos
+Para modificar seus arquivos, siga estes passos:
+Encontre o documento que voc pretende modificar.
+Deslize para a esquerda e voc ver "Renomear", "Mover", "Mesclar" e "Excluir".
+Toque em "Excluir" para excluir o arquivo. Ou toque em "Mover" para mov-lo para a pasta que voc criou.
+Como alternativa, toque em "Renomear" para renomear o arquivo.
+Ou selecione dois ou mais arquivos para mescl-los em um.
+Para restaurar arquivos excludos, siga estas etapas:
+Toque no cone menu no canto superior direito da pgina "Arquivos".
+Toque em "Lixeira".
+Selecione o arquivo que deseja restaurar e clique em "Restaurar" na parte inferior.
+11. Nuvem Plaud
+O PLAUD APP oferece o recurso de armazenamento em NUVEM. Voc tem a opo de enviar suas gravaes para a PLAUD PRIVATE CLOUD ou no, permitindo que voc conserve o espao de armazenamento interno do dispositivo.
+12. Compartilhar e exportar arquivos
+Se voc quiser compartilhar os arquivos com outras pessoas, voc s precisa compartilhar o link diretamente. O link ir expirar em 7 dias.
+Ao exportar udio, transcries, resumos e mapas mentais, h vrios formatos que voc pode escolher:
+Transcrio
+TXT, SRT, DOCX, PDF
+Resumo
+TXT, Markdown, DOCX, PDF
+Mapa mental
+JPEG, reduo de preo
+udio
+MP3, WAV
+13. Conhea o produto
+30 dias para devoluo
+Grtis, sem burocracia
+1 ano de garantia
+Consulte as condies
+Suporte vitalcio
+Mais tranquilidade para voc
+Receba todas as novidades da PLAUD
+Cadastre-se agora para ficar por dentro das nossas ofertas, novos produtos e parcerias exclusivas.
+Ao clicar no boto acima voc concorda com a
+poltica de privacidade
+da Plaud.
+PLAUD
+Poltica de privacidade
+Termos de uso
+Produtos
+Plaud Note
+Atendimento
+Segunda à Sexta das 09h às 18h.
++55 11 96902-9358
+sac@plaud.com.br
+2025 PLAUD. Todos os direitos reservados.
+Desenvolvido com tecnologia
+wBuy
+Plataforma

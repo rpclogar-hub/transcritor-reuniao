@@ -6,21 +6,22 @@
 <meta name="color-scheme" content="light dark">
 <title>Transcritor de Reunião</title>
 <style>
-  /* Layout: coluna única de celular; controle grande no topo, texto ao vivo no meio, ações de saída embaixo. */
+  /* Layout: coluna única de celular; controle no topo, texto ao vivo no meio, ferramentas e saída embaixo. */
   :root {
     --bg: #f3f5f8; --fg: #14202e; --muted: #5a6b7d; --card: #ffffff; --line: #d5dce5;
-    --accent: #1b4f9c; --accent-fg: #ffffff; --rec: #c0392b; --ok: #1f7a4d; --warn: #9a6200;
+    --accent: #1b4f9c; --accent-fg: #ffffff; --rec: #c0392b; --ok: #1f7a4d; --warn: #9a6200; --star: #b8860b;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #0e151d; --fg: #e6edf5; --muted: #93a3b5; --card: #172230; --line: #2a3a4d;
-      --accent: #6fa3ec; --accent-fg: #08121f; --rec: #ff6b5b; --ok: #4cc58a; --warn: #e0a84a; }
+      --accent: #6fa3ec; --accent-fg: #08121f; --rec: #ff6b5b; --ok: #4cc58a; --warn: #e0a84a; --star: #f0c040; }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     padding-inline: 16px; padding-block: max(16px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-bottom)); }
-  main { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  main { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
   h1 { font-size: 1.25rem; margin: 0; }
+  h2 { font-size: 1rem; margin: 0; }
   .sub { color: var(--muted); font-size: .875rem; margin: 0; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
   .painel { display: flex; flex-direction: column; gap: 12px; }
@@ -31,29 +32,54 @@
   @media (prefers-reduced-motion: reduce) { .gravando .ponto { animation: none; } }
   .tempo { font-size: 1.5rem; font-weight: 700; }
   .meta { color: var(--muted); font-size: .875rem; }
-  button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--fg);
-    border-radius: 10px; padding: 12px 14px; min-height: 48px; cursor: pointer; }
-  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  button, select, input[type=text], textarea { font: inherit; color: var(--fg); background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 12px; min-height: 44px; }
+  button { cursor: pointer; }
+  button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
   button.principal { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 700; font-size: 1.1rem; min-height: 56px; }
-  .gravando button.principal { background: var(--rec); border-color: var(--rec); color: #fff; }
+  .gravando button.principal.iniciar { background: var(--rec); border-color: var(--rec); color: #fff; }
+  button[disabled], select[disabled] { opacity: .5; cursor: not-allowed; }
+  button.sel { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }
   .grade { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .grade .largo { grid-column: 1 / -1; }
+  .campos { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  @media (max-width: 520px) { .campos { grid-template-columns: 1fr; } }
+  label.campo { display: flex; flex-direction: column; gap: 4px; font-size: .8125rem; color: var(--muted); }
+  label.campo select { color: var(--fg); font-size: 1rem; }
+  textarea, input[type=text] { width: 100%; }
+  textarea { min-height: 5rem; resize: vertical; }
   #texto { max-height: 46vh; overflow-y: auto; min-height: 9rem; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
-  .linha { margin: 0 0 8px; }
+  .linha { margin: 0 0 8px; cursor: pointer; }
+  .linha.dest { border-left: 3px solid var(--star); padding-left: 8px; }
+  .linha.nota { color: var(--muted); }
+  .linha .estrela { color: var(--star); font-weight: 700; }
   .hora { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .8125rem; margin-right: 6px; }
+  .quem { font-weight: 700; margin-right: 6px; cursor: pointer; text-decoration: underline dotted; }
   .parcial { color: var(--muted); font-style: italic; }
   .vazio { color: var(--muted); }
   #aviso { font-size: .9rem; min-height: 1.4em; margin: 0; }
   #aviso.erro { color: var(--rec); } #aviso.ok { color: var(--ok); } #aviso.atencao { color: var(--warn); }
   .confirma { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   ul.notas { margin: 0; padding-left: 1.2rem; color: var(--muted); font-size: .875rem; }
+  details > summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+  details[open] > summary { margin-bottom: 8px; }
+  .linhaflex { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .linhaflex > input { flex: 1 1 10rem; width: auto; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { min-height: 40px; padding: 6px 12px; }
+  .reuniao { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .reuniao:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+  .reuniao .acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+  .reuniao .acoes button { min-height: 40px; padding: 6px 10px; font-size: .9rem; }
+  .trecho { font-size: .875rem; color: var(--muted); margin: 0; }
+  .ajuda { font-size: .8125rem; color: var(--muted); margin: 0; }
 </style>
 </head>
 <body>
 <main id="raiz">
   <header>
     <h1>Transcritor de Reunião</h1>
-    <p class="sub">Só texto: o áudio não é gravado nem guardado. O texto fica neste aparelho.</p>
+    <p class="sub">Só texto: o áudio nunca é gravado nem guardado. O texto fica neste aparelho. Grátis, sem chave e sem conta.</p>
   </header>
 
   <section class="card painel" aria-label="Controle">
@@ -63,24 +89,111 @@
       <span class="meta" id="estado">Parado</span>
       <span class="meta" id="palavras">0 palavras</span>
     </div>
-    <button class="principal" id="btnIniciar" type="button">Iniciar transcrição</button>
+    <p class="meta" id="tituloAtual" style="margin:0"></p>
+    <div class="campos">
+      <label class="campo">Idioma
+        <select id="selIdioma"><option value="pt-BR">Português (Brasil)</option><option value="en-US">English (US)</option></select>
+      </label>
+      <label class="campo">De onde vem o áudio
+        <select id="selFonte">
+          <option value="mic">Microfone</option>
+          <option value="tela">Áudio do computador (aba/sistema)</option>
+          <option value="ambos">Computador + meu microfone</option>
+        </select>
+      </label>
+      <label class="campo">Motor de transcrição
+        <select id="selMotor">
+          <option value="chrome">Chrome (rápido, usa a internet)</option>
+          <option value="whisper">Whisper local (no navegador)</option>
+        </select>
+      </label>
+    </div>
+    <p class="ajuda" id="ajudaFonte"></p>
+    <button class="principal iniciar" id="btnIniciar" type="button">Iniciar transcrição</button>
     <p id="aviso" role="status" aria-live="polite"></p>
   </section>
 
   <section class="card" aria-label="Texto">
     <div id="texto" tabindex="0"><span class="vazio">O texto aparece aqui enquanto a reunião acontece.</span></div>
+    <p class="ajuda" style="margin-top:8px">Toque numa fala para marcar ★. Toque no nome do falante para trocá-lo.</p>
+  </section>
+
+  <section class="card painel" aria-label="Durante a reunião">
+    <div class="grade">
+      <button id="btnDestaque" type="button">★ Marcar momento</button>
+      <button id="btnNota" type="button">+ Nota digitada</button>
+    </div>
+    <div class="linhaflex" id="boxNota" hidden>
+      <input type="text" id="inpNota" placeholder="Digite a nota e toque em Salvar" autocomplete="off">
+      <button id="btnSalvarNota" type="button">Salvar</button>
+    </div>
+    <div>
+      <h2>Quem está falando</h2>
+      <p class="ajuda">Marcação manual: escolha o nome e as próximas falas ficam com ele.</p>
+      <div class="chips" id="chipsFalantes" style="margin-top:8px"></div>
+    </div>
   </section>
 
   <section class="card painel" aria-label="Saída">
+    <h2>Resumo, ata, mapa mental e perguntas (com o Claude)</h2>
+    <p class="ajuda">Escolha o modelo, copie e cole no app do Claude. Sem chave de API e sem custo extra.</p>
+    <label class="campo">Modelo
+      <select id="selModelo"></select>
+    </label>
+    <div id="boxPergunta" hidden>
+      <label class="campo">Sua pergunta sobre a reunião
+        <textarea id="inpPergunta" placeholder="Ex.: o que ficou combinado com o João e até quando?"></textarea>
+      </label>
+    </div>
+    <button class="principal" id="btnClaude" type="button">Copiar com instruções para o Claude</button>
+    <h2>Exportar</h2>
     <div class="grade">
-      <button class="largo principal" id="btnClaude" type="button">Copiar com instruções para o Claude</button>
       <button id="btnTexto" type="button">Copiar só o texto</button>
       <button id="btnCompartilhar" type="button">Compartilhar</button>
-      <button id="btnBaixar" type="button">Baixar .txt</button>
-      <button id="btnLimpar" type="button">Limpar</button>
+      <button id="btnTxt" type="button">Baixar .txt</button>
+      <button id="btnMd" type="button">Baixar .md</button>
+      <button id="btnSrt" type="button">Baixar .srt</button>
+      <button id="btnDoc" type="button">Baixar Word (.doc)</button>
+      <button class="largo" id="btnPdf" type="button">PDF (imprimir / salvar como PDF)</button>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Reuniões">
+    <details id="detReunioes">
+      <summary>Minhas reuniões</summary>
+      <div class="linhaflex">
+        <button id="btnNova" type="button" class="principal" style="min-height:48px;font-size:1rem">Nova reunião</button>
+      </div>
+      <div style="margin-top:10px"><input type="text" id="inpBusca" placeholder="Buscar em todas as reuniões" autocomplete="off"></div>
+      <div id="listaReunioes" style="margin-top:8px"></div>
+      <details id="detLixeira" style="margin-top:10px"><summary>Lixeira</summary><div id="listaLixeira"></div></details>
+    </details>
+  </section>
+
+  <section class="card" aria-label="Glossário">
+    <details>
+      <summary>Glossário (corrige termos e nomes)</summary>
+      <p class="ajuda">Uma regra por linha, no formato <b>errado = certo</b>. Vale para o texto novo, em qualquer idioma.</p>
+      <textarea id="inpGlossario" placeholder="cloude = Claude&#10;kiwi fai = Kiwify" spellcheck="false"></textarea>
+      <div class="linhaflex" style="margin-top:8px">
+        <button id="btnGlossario" type="button">Salvar glossário</button>
+        <button id="btnAplicarGlossario" type="button">Aplicar na reunião aberta</button>
+      </div>
+      <h2 style="margin-top:14px">Nomes de falantes</h2>
+      <div class="linhaflex" style="margin-top:8px">
+        <input type="text" id="inpFalante" placeholder="Nome (ex.: Maria)" autocomplete="off">
+        <button id="btnAddFalante" type="button">Adicionar</button>
+        <button id="btnLimpaFalantes" type="button">Remover todos</button>
+      </div>
+    </details>
+  </section>
+
+  <section class="card painel" aria-label="Limpar">
+    <div class="grade">
+      <button id="btnLimpar" type="button">Apagar texto desta reunião</button>
     </div>
     <div class="confirma" id="confirma" hidden>
-      <span>Apagar todo o texto deste aparelho?</span>
+      <span>Apagar todo o texto desta reunião?</span>
       <button id="btnSim" type="button">Sim, apagar</button>
       <button id="btnNao" type="button">Cancelar</button>
     </div>
@@ -88,133 +201,311 @@
 
   <ul class="notas">
     <li>Deixe a tela ligada e este navegador aberto durante a reunião.</li>
-    <li>O Chrome envia o áudio aos servidores do Google para reconhecer a fala. Avise os participantes.</li>
-    <li>Ao final, toque em "Copiar com instruções para o Claude" e cole no app do Claude.</li>
+    <li><b>Chrome (rápido):</b> só ouve o microfone e envia o áudio aos servidores do Google. Avise os participantes.</li>
+    <li><b>Whisper local:</b> a voz é transcrita dentro do seu navegador, sem enviar áudio a ninguém. Baixa um modelo (~80 MB) na primeira vez e é mais lento que o Chrome.</li>
+    <li><b>Áudio do computador:</b> só em Chrome/Edge no computador. Na janela que abrir, escolha a aba da reunião e marque "Compartilhar áudio". Windows também permite o áudio do sistema inteiro.</li>
+    <li><a href="manual.html">Manual passo a passo de uso</a></li>
+    <li><b>Celular:</b> o navegador do celular não consegue capturar o áudio interno. Use o microfone (com o som da chamada no alto-falante).</li>
   </ul>
 </main>
 
 <script>
 (function () {
   "use strict";
-  var CHAVE = "transcritor_reuniao_v1";
-  var PROMPT = [
-    "Abaixo está a transcrição bruta de uma reunião presencial, gerada por reconhecimento de voz. Não há identificação de quem fala. Faça um ETL completo e entregue um documento organizado.",
+  var CHAVE = "transcritor_reuniao_v2", CHAVE1 = "transcritor_reuniao_v1";
+  var URL_TRANSFORMERS = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3";
+  var MODELO_WHISPER = "Xenova/whisper-base";
+  var TAXA = 16000;
+
+  /* ---------- Modelos de instruções para colar no Claude ---------- */
+  var BASE = [
+    "Abaixo está a transcrição bruta de uma reunião, gerada por reconhecimento de voz. Pode haver erros de reconhecimento. Linhas com \"NOTA\" são anotações digitadas pelo usuário; linhas com ★ são momentos que o usuário marcou como importantes; nomes antes dos dois pontos foram marcados manualmente (podem faltar ou estar errados). Não invente fatos nem atribua falas por suposição.",
     "",
-    "1) CORREÇÃO DE PORTUGUÊS (obrigatória): todo o texto deve sair em português do Brasil corrigido gramaticalmente e ortograficamente (acentuação, crase, concordância, regência, pontuação, maiúsculas). A fala oral vira escrita clara, sem mudar o sentido. Corrija erros evidentes de reconhecimento de voz (palavras trocadas, nomes, siglas) usando o contexto. Se algo estiver ambíguo, marque \"(trecho incerto)\". Não invente fatos nem atribua falas por suposição.",
-    "",
-    "2) ORGANIZAÇÃO: remova vícios de fala, repetições e conversa paralela. Agrupe por assunto.",
-    "",
-    "3) DOCUMENTO FINAL, com as seções:",
-    "- Cabeçalho (título, data, duração aproximada, participantes citados)",
-    "- Resumo executivo (até 8 linhas)",
-    "- Decisões tomadas",
-    "- Pendências e próximos passos (tabela: ação | responsável | prazo)",
-    "- Tópicos discutidos (um bloco por assunto)",
-    "- Números, datas, nomes e valores citados",
-    "- Dúvidas em aberto e trechos incertos",
-    "- Glossário (se houver termos técnicos)",
-    "",
-    "4) Antes de entregar, releia tudo procurando erros de português e corrija.",
-    "",
-    "Transcrição:"
+    "REGRAS: entregue em português do Brasil corrigido (acentuação, crase, concordância, pontuação). Se a reunião estiver em outro idioma, traduza para o português e mantenha em itálico os termos originais importantes. Corrija erros evidentes de reconhecimento usando o contexto; se algo for ambíguo, marque \"(trecho incerto)\". Remova vícios de fala e repetições. Releia tudo no fim procurando erros."
   ].join("\n");
+
+  var MODELOS = {
+    ata: { nome: "Ata completa (padrão)", p: [
+      "TAREFA: ETL completo da reunião e documento final com as seções:",
+      "- Cabeçalho (título, data, duração aproximada, participantes citados)",
+      "- Resumo executivo (até 8 linhas)",
+      "- Decisões tomadas",
+      "- Pendências e próximos passos (tabela: ação | responsável | prazo)",
+      "- Tópicos discutidos (um bloco por assunto)",
+      "- Números, datas, nomes e valores citados",
+      "- Momentos marcados com ★ (o que foi dito e por que importa)",
+      "- Dúvidas em aberto e trechos incertos",
+      "- Glossário (se houver termos técnicos)"] },
+    executivo: { nome: "Resumo executivo curto", p: [
+      "TAREFA: resumo de no máximo 10 linhas para quem não participou, seguido de 3 a 5 decisões e as pendências mais urgentes."] },
+    vendas: { nome: "Chamada de vendas / cliente", p: [
+      "TAREFA: nota de reunião comercial com: perfil do cliente, dores e necessidades, objeções, interesse (alto/médio/baixo, com o motivo), orçamento e prazo citados, próximos passos com data, riscos e um rascunho curto de e-mail de follow-up."] },
+    entrevista: { nome: "Entrevista / candidato", p: [
+      "TAREFA: resumo estruturado da entrevista: perguntas e respostas principais (formato Q&A), pontos fortes, pontos de atenção, citações marcantes e uma avaliação final objetiva, sem inventar nada."] },
+    aula: { nome: "Aula / palestra", p: [
+      "TAREFA: anotações de estudo com: tema, conceitos-chave com definição, exemplos citados, passo a passo (se houver), 10 perguntas de revisão com respostas e um resumo de 1 parágrafo."] },
+    mapa: { nome: "Mapa mental", p: [
+      "TAREFA: mapa mental da reunião. Entregue (1) um bloco de código Mermaid com `mindmap` (raiz = tema da reunião; ramos = assuntos, decisões, pendências; folhas = detalhes curtos) e (2) o mesmo conteúdo como lista com marcadores indentada, para copiar em qualquer app."] },
+    tarefas: { nome: "Só tarefas e decisões", p: [
+      "TAREFA: extraia apenas (1) decisões, (2) tarefas em tabela (ação | responsável | prazo | prioridade) e (3) pendências sem dono. Se faltar responsável ou prazo, escreva \"não definido\"."] },
+    perguntar: { nome: "Perguntar à reunião", p: [
+      "TAREFA: responda à pergunta do usuário usando SOMENTE a transcrição. Cite o horário [hh:mm:ss] dos trechos usados. Se a resposta não estiver na transcrição, diga que não foi dita."] },
+    livre: { nome: "Só a transcrição (sem tarefa)", p: [
+      "TAREFA: aguarde minha próxima instrução. Por ora, apenas corrija o português da transcrição e devolva o texto limpo, mantendo os horários."] }
+  };
 
   var $ = function (id) { return document.getElementById(id); };
   var raiz = $("raiz"), elTexto = $("texto"), elTempo = $("tempo"), elEstado = $("estado"),
       elPalavras = $("palavras"), elAviso = $("aviso"), btnIniciar = $("btnIniciar");
 
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var estado = { linhas: [], decorrido: 0 };   // linhas: {t: segundos, s: texto}
-  var rec = null, rodando = false, parcial = "", ultimoFinal = "";
-  var inicioSessao = 0, base = 0, relogio = null, wake = null, reinicios = 0;
+  var CELULAR = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  var TEM_TELA = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) && !CELULAR;
+
+  /* ---------- Estado e persistência ---------- */
+  var S = { atual: null, reunioes: [], glossario: "", falantes: [], cfg: { lang: "pt-BR", fonte: "mic", motor: "chrome", falante: "" } };
+  var rodando = false, parcial = "", ultimoFinal = "", rec = null;
+  var inicioSessao = 0, base = 0, relogio = null, wake = null;
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
   function hhmmss(s) { s = Math.floor(s); return pad(Math.floor(s / 3600)) + ":" + pad(Math.floor(s % 3600 / 60)) + ":" + pad(s % 60); }
   function aviso(msg, tipo) { elAviso.textContent = msg || ""; elAviso.className = tipo || ""; }
+  function novoId() { return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+  function dataCurta(ms) { var d = new Date(ms); return pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes()); }
 
-  function salvar() { try { localStorage.setItem(CHAVE, JSON.stringify(estado)); } catch (e) {} }
+  function salvar() { try { localStorage.setItem(CHAVE, JSON.stringify(S)); } catch (e) {} }
+  function novaReuniao() {
+    var m = { id: novoId(), titulo: "Reunião " + dataCurta(Date.now()), criada: Date.now(), decorrido: 0, linhas: [], lixo: false };
+    S.reunioes.push(m); S.atual = m.id; return m;
+  }
+  function cur() {
+    for (var i = 0; i < S.reunioes.length; i++) { if (S.reunioes[i].id === S.atual && !S.reunioes[i].lixo) return S.reunioes[i]; }
+    for (var j = 0; j < S.reunioes.length; j++) { if (!S.reunioes[j].lixo) { S.atual = S.reunioes[j].id; return S.reunioes[j]; } }
+    return novaReuniao();
+  }
   function carregar() {
     try {
       var d = JSON.parse(localStorage.getItem(CHAVE) || "null");
-      if (d && Array.isArray(d.linhas)) { estado = { linhas: d.linhas, decorrido: +d.decorrido || 0 }; }
+      if (d && Array.isArray(d.reunioes)) {
+        S.atual = d.atual; S.reunioes = d.reunioes; S.glossario = d.glossario || ""; S.falantes = d.falantes || [];
+        for (var k in S.cfg) { if (d.cfg && d.cfg[k] !== undefined) S.cfg[k] = d.cfg[k]; }
+        return;
+      }
+      var v1 = JSON.parse(localStorage.getItem(CHAVE1) || "null");   // migra a versão antiga (uma única reunião)
+      if (v1 && Array.isArray(v1.linhas) && v1.linhas.length) {
+        var m = novaReuniao(); m.titulo = "Reunião anterior";
+        m.linhas = v1.linhas.map(function (l) { return { t: l.t, s: l.s, f: "", k: "fala" }; });
+        m.decorrido = +v1.decorrido || 0;
+      }
     } catch (e) {}
   }
 
-  function textoPuro() {
-    return estado.linhas.map(function (l) { return "[" + hhmmss(l.t) + "] " + l.s; }).join("\n");
+  /* ---------- Texto, glossário, contagem ---------- */
+  function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
+  function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+  function regrasGlossario() {
+    return S.glossario.split("\n").map(function (l) {
+      var i = l.indexOf("="); if (i < 1) return null;
+      var a = l.slice(0, i).trim(), b = l.slice(i + 1).trim();
+      return a ? { re: new RegExp("(^|[^\\p{L}\\p{N}])" + esc(a) + "(?![\\p{L}\\p{N}])", "giu"), b: b } : null;
+    }).filter(Boolean);
   }
-  function contarPalavras() {
-    return estado.linhas.reduce(function (n, l) { return n + l.s.split(/\s+/).filter(Boolean).length; }, 0);
+  function aplicarGlossario(t) {
+    regrasGlossario().forEach(function (r) { t = t.replace(r.re, function (_m, pre) { return pre + r.b; }); });
+    return t;
+  }
+  function linhaTexto(l) {
+    var q = l.f ? l.f + ": " : "";
+    if (l.k === "dest") return "[" + hhmmss(l.t) + "] ★ MOMENTO IMPORTANTE";
+    if (l.k === "nota") return "[" + hhmmss(l.t) + "] NOTA: " + l.s;
+    return "[" + hhmmss(l.t) + "] " + (l.d ? "★ " : "") + q + l.s;
+  }
+  function textoPuro(m) { return (m || cur()).linhas.map(linhaTexto).join("\n"); }
+  function contarPalavras(m) {
+    return m.linhas.reduce(function (n, l) { return n + (l.k === "dest" ? 0 : l.s.split(/\s+/).filter(Boolean).length); }, 0);
+  }
+  function segAgora() { return base + (rodando ? (Date.now() - inicioSessao) / 1000 : 0); }
+
+  function addLinha(txt, t, k) {
+    txt = txt.replace(/\s+/g, " ").trim();
+    if (!txt && k !== "dest") return;
+    if (k !== "nota" && k !== "dest") txt = aplicarGlossario(cap(txt));
+    var m = cur();
+    m.linhas.push({ t: t == null ? segAgora() : t, s: txt, f: (k === "nota" || k === "dest") ? "" : S.cfg.falante, k: k || "fala" });
+    m.decorrido = Math.max(m.decorrido, segAgora());
+    salvar();
   }
 
+  /* ---------- Desenho ---------- */
   function desenhar() {
+    var m = cur();
+    $("tituloAtual").textContent = m.titulo;
     elTexto.textContent = "";
-    if (!estado.linhas.length && !parcial) {
+    if (!m.linhas.length && !parcial) {
       var v = document.createElement("span"); v.className = "vazio";
       v.textContent = "O texto aparece aqui enquanto a reunião acontece.";
       elTexto.appendChild(v);
     }
-    estado.linhas.forEach(function (l) {
-      var p = document.createElement("p"); p.className = "linha";
-      var h = document.createElement("span"); h.className = "hora"; h.textContent = hhmmss(l.t);
-      p.appendChild(h); p.appendChild(document.createTextNode(l.s));
+    m.linhas.forEach(function (l, i) {
+      var p = document.createElement("p");
+      p.className = "linha" + (l.d || l.k === "dest" ? " dest" : "") + (l.k === "nota" ? " nota" : "");
+      var h = document.createElement("span"); h.className = "hora"; h.textContent = hhmmss(l.t); p.appendChild(h);
+      if (l.k === "dest") {
+        var e = document.createElement("span"); e.className = "estrela"; e.textContent = "★ Momento marcado"; p.appendChild(e);
+      } else {
+        if (l.d) { var s2 = document.createElement("span"); s2.className = "estrela"; s2.textContent = "★ "; p.appendChild(s2); }
+        if (l.k === "nota") { var n = document.createElement("b"); n.textContent = "Nota: "; p.appendChild(n); }
+        else if (l.f) {
+          var q = document.createElement("span"); q.className = "quem"; q.textContent = l.f + ":"; q.dataset.i = i; q.title = "Trocar falante"; p.appendChild(q);
+        } else if (S.falantes.length && l.k === "fala") {
+          var q2 = document.createElement("span"); q2.className = "quem"; q2.textContent = "[quem?]"; q2.dataset.i = i; q2.style.fontWeight = "400"; p.appendChild(q2);
+        }
+        p.appendChild(document.createTextNode(l.s));
+      }
+      p.dataset.i = i;
       elTexto.appendChild(p);
     });
     if (parcial) {
-      var q = document.createElement("p"); q.className = "linha parcial"; q.textContent = parcial;
-      elTexto.appendChild(q);
+      var pp = document.createElement("p"); pp.className = "linha parcial"; pp.textContent = parcial; elTexto.appendChild(pp);
     }
     elTexto.scrollTop = elTexto.scrollHeight;
-    var n = contarPalavras();
-    elPalavras.textContent = n + (n === 1 ? " palavra" : " palavras");
+    var c = contarPalavras(m);
+    elPalavras.textContent = c + (c === 1 ? " palavra" : " palavras");
+    btnIniciar.textContent = rodando ? "Parar transcrição" : (m.linhas.length ? "Retomar transcrição" : "Iniciar transcrição");
   }
 
-  function segundosAgora() { return base + (rodando ? (Date.now() - inicioSessao) / 1000 : 0); }
-  function tick() { elTempo.textContent = hhmmss(segundosAgora()); }
+  elTexto.addEventListener("click", function (ev) {
+    var alvo = ev.target, m = cur();
+    var q = alvo.closest && alvo.closest(".quem");
+    var p = alvo.closest && alvo.closest(".linha");
+    if (!p || p.dataset.i === undefined) return;
+    var l = m.linhas[+p.dataset.i]; if (!l) return;
+    if (q) {                                           // cicla o falante da linha
+      var lista = [""].concat(S.falantes), pos = lista.indexOf(l.f || "");
+      l.f = lista[(pos + 1) % lista.length];
+    } else if (l.k !== "dest") { l.d = !l.d; }          // marca/desmarca ★
+    else { m.linhas.splice(+p.dataset.i, 1); }
+    salvar(); desenhar();
+  });
 
-  function adicionarFinal(txt) {
-    txt = txt.replace(/\s+/g, " ").trim();
-    if (!txt || txt === ultimoFinal) return;          // evita repetição comum no Chrome do Android
-    ultimoFinal = txt;
-    estado.linhas.push({ t: segundosAgora(), s: txt.charAt(0).toUpperCase() + txt.slice(1) });
-    estado.decorrido = segundosAgora();
-    salvar();
-  }
+  function tick() { elTempo.textContent = hhmmss(segAgora()); }
 
+  /* ---------- Motor 1: reconhecimento do Chrome (só microfone) ---------- */
   function criarRec() {
     var r = new SR();
-    r.lang = "pt-BR"; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    r.lang = S.cfg.lang; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
     r.onresult = function (ev) {
       var interino = "";
       for (var i = ev.resultIndex; i < ev.results.length; i++) {
         var res = ev.results[i];
-        if (res.isFinal) { adicionarFinal(res[0].transcript); }
-        else { interino += res[0].transcript; }
+        if (res.isFinal) { finalChrome(res[0].transcript); } else { interino += res[0].transcript; }
       }
-      parcial = interino.trim();
-      desenhar();
+      parcial = interino.trim(); desenhar();
     };
     r.onerror = function (ev) {
       if (ev.error === "not-allowed" || ev.error === "service-not-allowed") {
-        aviso("Microfone bloqueado. Permita o microfone para este site nas configurações do navegador.", "erro");
-        parar(true);
-      } else if (ev.error === "audio-capture") {
-        aviso("Nenhum microfone encontrado.", "erro"); parar(true);
-      } else if (ev.error === "network") {
-        aviso("Sem internet para reconhecer a fala. Tentando de novo...", "atencao");
-      }
-      /* no-speech e aborted: o onend reinicia sozinho */
+        aviso("Microfone bloqueado. Permita o microfone para este site nas configurações do navegador.", "erro"); parar(true);
+      } else if (ev.error === "audio-capture") { aviso("Nenhum microfone encontrado.", "erro"); parar(true); }
+      else if (ev.error === "network") { aviso("Sem internet para reconhecer a fala. Tentando de novo...", "atencao"); }
     };
     r.onend = function () {
-      if (parcial) { adicionarFinal(parcial); parcial = ""; desenhar(); }
-      if (rodando) {
-        reinicios++;
-        setTimeout(function () { if (rodando) { try { r.start(); } catch (e) {} } }, 250);
-      }
+      if (parcial) { finalChrome(parcial); parcial = ""; desenhar(); }
+      if (rodando && S.cfg.motor === "chrome") { setTimeout(function () { if (rodando) { try { r.start(); } catch (e) {} } }, 250); }
     };
     return r;
   }
+  function finalChrome(txt) {
+    txt = txt.replace(/\s+/g, " ").trim();
+    if (!txt || txt === ultimoFinal) return;           // evita repetição comum no Chrome do Android
+    ultimoFinal = txt; addLinha(txt);
+  }
 
+  /* ---------- Motor 2: Whisper local (qualquer fonte de áudio) ---------- */
+  var asr = null, carregandoModelo = null, actx = null, proc = null, fluxos = [], pedacos = [], tam = 0,
+      silencio = 0, iniPedaco = 0, fila = Promise.resolve(), pendentes = 0;
+
+  function carregarModelo() {
+    if (asr) return Promise.resolve(asr);
+    if (carregandoModelo) return carregandoModelo;
+    aviso("Baixando o modelo de voz (só na primeira vez, ~80 MB)...", "atencao");
+    carregandoModelo = import(URL_TRANSFORMERS).then(function (mod) {
+      return mod.pipeline("automatic-speech-recognition", MODELO_WHISPER, {
+        progress_callback: function (p) { if (p && p.status === "progress" && rodando) { aviso("Baixando modelo de voz: " + Math.round(p.progress) + "%", "atencao"); } }
+      });
+    }).then(function (p) { asr = p; if (rodando) aviso("Modelo pronto. Transcrevendo (aparece alguns segundos depois da fala).", "ok"); return p; })
+      .catch(function (e) { carregandoModelo = null; throw e; });
+    return carregandoModelo;
+  }
+
+  var ALUCINACOES = /^(obrigad[oa][.!]?|legendas? pela comunidade.*|thanks for watching[.!]?|thank you[.!]?|you|\.+|\[.*\]|\(.*\)|♪.*)$/i;
+
+  function enviarPedaco() {
+    if (!tam) return;
+    var dados = new Float32Array(tam), o = 0;
+    pedacos.forEach(function (b) { dados.set(b, o); o += b.length; });
+    var t0 = iniPedaco; pedacos = []; tam = 0; silencio = 0;
+    if (dados.length < TAXA * 1.0) return;
+    pendentes++;
+    if (pendentes > 3) aviso("A transcrição está atrasada em relação à fala. Troque para o motor Chrome se for só microfone.", "atencao");
+    var lang = S.cfg.lang === "en-US" ? "english" : "portuguese";
+    fila = fila.then(function () { return carregarModelo(); }).then(function (m) {
+      return m(dados, { language: lang, task: "transcribe" });
+    }).then(function (r) {
+      var txt = ((r && r.text) || "").trim();
+      if (txt && !ALUCINACOES.test(txt)) { addLinha(txt, t0); desenhar(); }
+    }).catch(function (e) {
+      aviso("Falha no Whisper: " + (e && e.message ? e.message : e), "erro");
+    }).then(function () { pendentes--; });
+  }
+
+  function aoReceberAudio(ev) {
+    var entrada = ev.inputBuffer.getChannelData(0), n = entrada.length, soma = 0, i;
+    for (i = 0; i < n; i++) soma += entrada[i] * entrada[i];
+    var rms = Math.sqrt(soma / n), falando = rms > 0.012;
+    if (!tam && !falando) return;                      // descarta silêncio inicial
+    if (!tam) iniPedaco = segAgora();
+    pedacos.push(new Float32Array(entrada)); tam += n;
+    silencio = falando ? 0 : silencio + n;
+    if ((tam >= TAXA * 6 && silencio >= TAXA * 0.7) || tam >= TAXA * 20) enviarPedaco();
+  }
+
+  async function abrirFluxos() {
+    var lista = [];
+    if (S.cfg.fonte === "mic" || S.cfg.fonte === "ambos") {
+      lista.push(await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }));
+    }
+    if (S.cfg.fonte === "tela" || S.cfg.fonte === "ambos") {
+      var tela = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      tela.getVideoTracks().forEach(function (t) { t.stop(); });   // só o áudio interessa
+      if (!tela.getAudioTracks().length) {
+        lista.forEach(function (s) { s.getTracks().forEach(function (t) { t.stop(); }); });
+        throw new Error("sem-audio-tela");
+      }
+      tela.getAudioTracks()[0].addEventListener("ended", function () { if (rodando) { aviso("O compartilhamento de áudio foi encerrado.", "atencao"); parar(false); } });
+      lista.push(tela);
+    }
+    return lista;
+  }
+
+  async function iniciarWhisper() {
+    fluxos = await abrirFluxos();
+    actx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: TAXA });
+    proc = actx.createScriptProcessor(4096, 1, 1);
+    proc.onaudioprocess = aoReceberAudio;
+    fluxos.forEach(function (f) { actx.createMediaStreamSource(f).connect(proc); });
+    proc.connect(actx.destination);                    // necessário para o processador funcionar; sem eco (a entrada não é repassada)
+    pedacos = []; tam = 0; silencio = 0;
+    carregarModelo().catch(function (e) { aviso("Não consegui baixar o modelo de voz: " + (e && e.message ? e.message : e), "erro"); });
+  }
+  function pararWhisper() {
+    try { enviarPedaco(); } catch (e) {}
+    try { if (proc) { proc.disconnect(); proc.onaudioprocess = null; } } catch (e) {}
+    try { if (actx) actx.close(); } catch (e) {}
+    fluxos.forEach(function (f) { f.getTracks().forEach(function (t) { t.stop(); }); });
+    proc = null; actx = null; fluxos = [];
+  }
+
+  /* ---------- Iniciar / parar ---------- */
   async function pedirTelaLigada() {
     try { if (navigator.wakeLock) { wake = await navigator.wakeLock.request("screen"); } } catch (e) { wake = null; }
   }
@@ -225,36 +516,156 @@
     }
   });
 
-  function iniciar() {
-    if (!SR) { aviso("Este navegador não tem reconhecimento de voz. Use o Chrome no Android.", "erro"); return; }
-    base = estado.decorrido; inicioSessao = Date.now(); ultimoFinal = ""; parcial = "";
-    rec = criarRec(); rodando = true;
-    try { rec.start(); } catch (e) { aviso("Não foi possível iniciar o microfone.", "erro"); rodando = false; return; }
+  async function iniciar() {
+    var cfg = S.cfg, m = cur();
+    if (cfg.motor === "chrome" && cfg.fonte !== "mic") cfg.motor = "whisper";
+    if (cfg.motor === "chrome" && !SR) { aviso("Este navegador não tem reconhecimento de voz do Chrome. Troque o motor para Whisper local.", "erro"); return; }
+    if (cfg.fonte !== "mic" && !TEM_TELA) { aviso("Este aparelho não consegue capturar o áudio interno. Use o microfone.", "erro"); return; }
+    base = m.decorrido; inicioSessao = Date.now(); ultimoFinal = ""; parcial = ""; rodando = true;
+    raiz.classList.add("gravando");
+    try {
+      if (cfg.motor === "chrome") {
+        rec = criarRec(); rec.start();
+        aviso("Transcrevendo. Mantenha a tela ligada.", "ok");
+      } else {
+        aviso("Iniciando...", "atencao");
+        await iniciarWhisper();
+        if (!asr) aviso("Preparando o modelo de voz...", "atencao");
+      }
+    } catch (e) {
+      rodando = false; raiz.classList.remove("gravando"); pararWhisper();
+      var msg = e && e.message === "sem-audio-tela" ? "Nenhum áudio foi compartilhado. Na janela do navegador, escolha a aba e marque \"Compartilhar áudio\"."
+        : e && e.name === "NotAllowedError" ? "Permissão negada (microfone ou compartilhamento de tela)."
+        : "Não foi possível iniciar: " + (e && e.message ? e.message : e);
+      aviso(msg, "erro"); desenhar(); return;
+    }
     pedirTelaLigada();
     relogio = setInterval(tick, 500);
-    raiz.classList.add("gravando");
-    btnIniciar.textContent = "Parar transcrição";
-    elEstado.textContent = "Ouvindo";
-    aviso("Transcrevendo. Mantenha a tela ligada.", "ok");
+    elEstado.textContent = "Ouvindo"; travarConfig(true); desenhar();
   }
 
   function parar(porErro) {
-    if (rodando) { estado.decorrido = segundosAgora(); }
+    var m = cur();
+    if (rodando) { m.decorrido = segAgora(); }
     rodando = false;
     clearInterval(relogio);
-    try { if (rec) rec.stop(); } catch (e) {}
+    try { if (rec) { rec.onend = null; rec.stop(); } } catch (e) {}
+    pararWhisper();
     try { if (wake) wake.release(); } catch (e) {}
     wake = null;
-    if (parcial) { adicionarFinal(parcial); parcial = ""; }
-    salvar(); desenhar(); tick();
+    if (parcial) { addLinha(parcial); parcial = ""; }
+    salvar(); tick();
     raiz.classList.remove("gravando");
-    btnIniciar.textContent = estado.linhas.length ? "Retomar transcrição" : "Iniciar transcrição";
-    elEstado.textContent = "Parado";
-    if (!porErro) aviso("Parado. O texto está salvo neste aparelho.", "ok");
+    elEstado.textContent = "Parado"; travarConfig(false); desenhar();
+    if (!porErro) aviso(pendentes ? "Parado. Ainda terminando de transcrever o último trecho..." : "Parado. O texto está salvo neste aparelho.", "ok");
   }
-
   btnIniciar.addEventListener("click", function () { rodando ? parar(false) : iniciar(); });
 
+  /* ---------- Configurações (idioma, fonte, motor) ---------- */
+  function travarConfig(sim) { ["selIdioma", "selFonte", "selMotor"].forEach(function (id) { $(id).disabled = sim; }); }
+  function atualizarConfig() {
+    var cfg = S.cfg;
+    $("selIdioma").value = cfg.lang; $("selFonte").value = cfg.fonte; $("selMotor").value = cfg.motor;
+    var optsFonte = $("selFonte").options;
+    for (var i = 0; i < optsFonte.length; i++) { if (optsFonte[i].value !== "mic") optsFonte[i].disabled = !TEM_TELA; }
+    if (!TEM_TELA && cfg.fonte !== "mic") { cfg.fonte = "mic"; $("selFonte").value = "mic"; }
+    $("selMotor").options[0].disabled = (cfg.fonte !== "mic") || !SR;
+    if (cfg.fonte !== "mic" && cfg.motor === "chrome") { cfg.motor = "whisper"; $("selMotor").value = "whisper"; }
+    if (!SR && cfg.motor === "chrome") { cfg.motor = "whisper"; $("selMotor").value = "whisper"; }
+    var ajuda = "";
+    if (CELULAR) ajuda = "No celular só o microfone está disponível. Para chamadas, coloque no alto-falante.";
+    else if (cfg.fonte !== "mic") ajuda = "Vai abrir a janela de compartilhamento: escolha a aba (ou a tela, no Windows) e marque \"Compartilhar áudio\".";
+    else if (cfg.motor === "whisper") ajuda = "Whisper local: o áudio é processado só neste navegador. A primeira vez baixa ~80 MB.";
+    $("ajudaFonte").textContent = ajuda;
+    salvar();
+  }
+  $("selIdioma").addEventListener("change", function () { S.cfg.lang = this.value; atualizarConfig(); });
+  $("selFonte").addEventListener("change", function () { S.cfg.fonte = this.value; atualizarConfig(); });
+  $("selMotor").addEventListener("change", function () { S.cfg.motor = this.value; atualizarConfig(); });
+
+  /* ---------- Destaque, nota, falantes ---------- */
+  $("btnDestaque").addEventListener("click", function () { addLinha("", null, "dest"); desenhar(); aviso("Momento marcado.", "ok"); });
+  $("btnNota").addEventListener("click", function () { $("boxNota").hidden = !$("boxNota").hidden; if (!$("boxNota").hidden) $("inpNota").focus(); });
+  function salvarNota() { var v = $("inpNota").value.trim(); if (!v) return; addLinha(v, null, "nota"); $("inpNota").value = ""; desenhar(); }
+  $("btnSalvarNota").addEventListener("click", salvarNota);
+  $("inpNota").addEventListener("keydown", function (e) { if (e.key === "Enter") salvarNota(); });
+
+  function desenharFalantes() {
+    var box = $("chipsFalantes"); box.textContent = "";
+    [""].concat(S.falantes).forEach(function (nome) {
+      var b = document.createElement("button"); b.type = "button";
+      b.textContent = nome || "Sem nome"; if (S.cfg.falante === nome) b.className = "sel";
+      b.addEventListener("click", function () { S.cfg.falante = nome; salvar(); desenharFalantes(); });
+      box.appendChild(b);
+    });
+  }
+  $("btnAddFalante").addEventListener("click", function () {
+    var v = $("inpFalante").value.trim(); if (!v) return;
+    if (S.falantes.indexOf(v) < 0) S.falantes.push(v);
+    S.cfg.falante = v; $("inpFalante").value = ""; salvar(); desenharFalantes(); desenhar();
+  });
+  $("btnLimpaFalantes").addEventListener("click", function () { S.falantes = []; S.cfg.falante = ""; salvar(); desenharFalantes(); desenhar(); });
+
+  /* ---------- Glossário ---------- */
+  $("btnGlossario").addEventListener("click", function () { S.glossario = $("inpGlossario").value; salvar(); aviso("Glossário salvo.", "ok"); });
+  $("btnAplicarGlossario").addEventListener("click", function () {
+    S.glossario = $("inpGlossario").value;
+    cur().linhas.forEach(function (l) { if (l.k === "fala") l.s = aplicarGlossario(l.s); });
+    salvar(); desenhar(); aviso("Glossário aplicado nesta reunião.", "ok");
+  });
+
+  /* ---------- Reuniões (pasta, busca, lixeira, mesclar) ---------- */
+  function botao(txt, fn) { var b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.addEventListener("click", fn); return b; }
+  function desenharReunioes() {
+    var box = $("listaReunioes"), lix = $("listaLixeira"), q = $("inpBusca").value.trim().toLowerCase();
+    box.textContent = ""; lix.textContent = "";
+    S.reunioes.slice().sort(function (a, b) { return b.criada - a.criada; }).forEach(function (m) {
+      var achados = [];
+      if (q) {
+        if (m.titulo.toLowerCase().indexOf(q) >= 0) achados.push("(título)");
+        m.linhas.forEach(function (l) { if (achados.length < 3 && l.s.toLowerCase().indexOf(q) >= 0) achados.push("[" + hhmmss(l.t) + "] " + l.s); });
+        if (!achados.length) return;
+      }
+      var d = document.createElement("div"); d.className = "reuniao";
+      var t = document.createElement("div"); t.textContent = (m.id === S.atual && !m.lixo ? "● " : "") + m.titulo;
+      t.style.fontWeight = "700";
+      var info = document.createElement("p"); info.className = "trecho";
+      info.textContent = dataCurta(m.criada) + " · " + hhmmss(m.decorrido) + " · " + contarPalavras(m) + " palavras";
+      d.appendChild(t); d.appendChild(info);
+      achados.forEach(function (a) { var p = document.createElement("p"); p.className = "trecho"; p.textContent = a; d.appendChild(p); });
+      var ac = document.createElement("div"); ac.className = "acoes";
+      if (!m.lixo) {
+        if (m.id !== S.atual) ac.appendChild(botao("Abrir", function () { if (rodando) { aviso("Pare a transcrição antes de trocar de reunião.", "atencao"); return; } S.atual = m.id; salvar(); desenhar(); desenharReunioes(); }));
+        ac.appendChild(botao("Renomear", function () { var n = prompt("Novo nome:", m.titulo); if (n && n.trim()) { m.titulo = n.trim(); salvar(); desenhar(); desenharReunioes(); } }));
+        if (m.id !== S.atual) ac.appendChild(botao("Mesclar na aberta", function () {
+          if (rodando) { aviso("Pare a transcrição antes de mesclar.", "atencao"); return; }
+          var alvo = cur(), deslocamento = alvo.decorrido;
+          m.linhas.forEach(function (l) { var c = JSON.parse(JSON.stringify(l)); c.t += deslocamento; alvo.linhas.push(c); });
+          alvo.decorrido += m.decorrido; m.lixo = true; salvar(); desenhar(); desenharReunioes(); aviso("Reuniões mescladas (a outra foi para a lixeira).", "ok");
+        }));
+        ac.appendChild(botao("Apagar", function () {
+          if (rodando && m.id === S.atual) { aviso("Pare a transcrição antes de apagar.", "atencao"); return; }
+          m.lixo = true; salvar(); desenhar(); desenharReunioes();
+        }));
+        d.appendChild(ac); box.appendChild(d);
+      } else {
+        ac.appendChild(botao("Restaurar", function () { m.lixo = false; salvar(); desenharReunioes(); }));
+        ac.appendChild(botao("Excluir de vez", function () { S.reunioes = S.reunioes.filter(function (x) { return x !== m; }); salvar(); desenharReunioes(); }));
+        d.appendChild(ac); lix.appendChild(d);
+      }
+    });
+    if (!box.children.length) { var v = document.createElement("p"); v.className = "ajuda"; v.textContent = q ? "Nada encontrado." : "Nenhuma reunião."; box.appendChild(v); }
+    if (!lix.children.length) { var v2 = document.createElement("p"); v2.className = "ajuda"; v2.textContent = "Lixeira vazia."; lix.appendChild(v2); }
+  }
+  $("inpBusca").addEventListener("input", desenharReunioes);
+  $("detReunioes").addEventListener("toggle", desenharReunioes);
+  $("btnNova").addEventListener("click", function () {
+    if (rodando) { aviso("Pare a transcrição antes de criar outra reunião.", "atencao"); return; }
+    novaReuniao(); salvar(); desenhar(); tick(); desenharReunioes(); aviso("Nova reunião criada.", "ok");
+  });
+
+  /* ---------- Saída: Claude e exportações ---------- */
+  function haTexto() { if (!cur().linhas.length) { aviso("Ainda não há texto.", "atencao"); return false; } return true; }
   async function copiar(txt, okMsg) {
     try { await navigator.clipboard.writeText(txt); aviso(okMsg, "ok"); }
     catch (e) {
@@ -265,37 +676,85 @@
       aviso(ok ? okMsg : "Não consegui copiar. Use Baixar .txt.", ok ? "ok" : "erro");
     }
   }
-  function haTexto() { if (!estado.linhas.length) { aviso("Ainda não há texto.", "atencao"); return false; } return true; }
+  function baixar(conteudo, ext, tipo) {
+    var d = new Date(), m = cur();
+    var nome = "reuniao_" + d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes()) + "." + ext;
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([conteudo], { type: tipo + ";charset=utf-8" }));
+    a.download = nome; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    aviso("Arquivo " + nome + " gerado.", "ok");
+  }
+  function cabecalho(m) { return "Reunião: " + m.titulo + " · Data: " + new Date(m.criada).toLocaleDateString("pt-BR") + " · Duração aproximada: " + hhmmss(m.decorrido) + " · Idioma falado: " + (S.cfg.lang === "en-US" ? "inglês" : "português do Brasil"); }
+  function htmlDoc(m) {
+    var h = function (s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+    return "<!doctype html><html lang=\"pt-BR\"><head><meta charset=\"utf-8\"><title>" + h(m.titulo) + "</title>" +
+      "<style>body{font-family:Calibri,Arial,sans-serif;line-height:1.5;max-width:780px;margin:24px auto}p{margin:0 0 8px}.t{color:#666}</style></head><body><h1>" + h(m.titulo) + "</h1><p class=\"t\">" + h(cabecalho(m)) + "</p>" +
+      m.linhas.map(function (l) { return "<p>" + h(linhaTexto(l)) + "</p>"; }).join("") + "</body></html>";
+  }
+  function srtTempo(s) { var ms = Math.round((s % 1) * 1000), i = Math.floor(s); return hhmmss(i) + "," + (ms < 100 ? (ms < 10 ? "00" : "0") : "") + ms; }
+  function srt(m) {
+    var linhas = m.linhas.filter(function (l) { return l.k !== "dest"; });
+    return linhas.map(function (l, i) {
+      var fim = i + 1 < linhas.length ? Math.max(l.t + 1, Math.min(linhas[i + 1].t, l.t + 8)) : l.t + 4;
+      return (i + 1) + "\n" + srtTempo(l.t) + " --> " + srtTempo(fim) + "\n" + (l.f ? l.f + ": " : "") + (l.k === "nota" ? "[NOTA] " : "") + l.s + "\n";
+    }).join("\n");
+  }
+  function markdown(m) {
+    return "# " + m.titulo + "\n\n" + cabecalho(m) + "\n\n" + m.linhas.map(function (l) {
+      if (l.k === "dest") return "- **[" + hhmmss(l.t) + "] ★ Momento importante**";
+      if (l.k === "nota") return "- **[" + hhmmss(l.t) + "] Nota:** " + l.s;
+      return "- [" + hhmmss(l.t) + "] " + (l.d ? "★ " : "") + (l.f ? "**" + l.f + ":** " : "") + l.s;
+    }).join("\n") + "\n";
+  }
 
+  function montarModelos() {
+    var s = $("selModelo"); s.textContent = "";
+    Object.keys(MODELOS).forEach(function (k) { var o = document.createElement("option"); o.value = k; o.textContent = MODELOS[k].nome; s.appendChild(o); });
+  }
+  $("selModelo").addEventListener("change", function () { $("boxPergunta").hidden = this.value !== "perguntar"; });
   $("btnClaude").addEventListener("click", function () {
     if (!haTexto()) return;
-    var cab = "Data da reunião: " + new Date().toLocaleDateString("pt-BR") + " · Duração aproximada: " + hhmmss(estado.decorrido) + "\n\n";
-    copiar(PROMPT + "\n\n" + cab + textoPuro(), "Copiado. Abra o app do Claude e cole.");
+    var k = $("selModelo").value, m = cur(), extra = "";
+    if (k === "perguntar") {
+      var q = $("inpPergunta").value.trim();
+      if (!q) { aviso("Digite a pergunta primeiro.", "atencao"); return; }
+      extra = "\n\nPERGUNTA: " + q;
+    }
+    var prompt = BASE + "\n\n" + MODELOS[k].p.join("\n") + extra + "\n\n" + cabecalho(m) + "\n\nTranscrição:\n" + textoPuro(m);
+    copiar(prompt, "Copiado. Abra o app do Claude e cole.");
   });
   $("btnTexto").addEventListener("click", function () { if (haTexto()) copiar(textoPuro(), "Texto copiado."); });
   $("btnCompartilhar").addEventListener("click", async function () {
     if (!haTexto()) return;
-    if (navigator.share) { try { await navigator.share({ title: "Transcrição da reunião", text: textoPuro() }); } catch (e) {} }
+    if (navigator.share) { try { await navigator.share({ title: cur().titulo, text: textoPuro() }); } catch (e) {} }
     else { copiar(textoPuro(), "Compartilhar não existe aqui. Texto copiado."); }
   });
-  $("btnBaixar").addEventListener("click", function () {
+  $("btnTxt").addEventListener("click", function () { if (haTexto()) baixar(cabecalho(cur()) + "\n\n" + textoPuro() + "\n", "txt", "text/plain"); });
+  $("btnMd").addEventListener("click", function () { if (haTexto()) baixar(markdown(cur()), "md", "text/markdown"); });
+  $("btnSrt").addEventListener("click", function () { if (haTexto()) baixar(srt(cur()), "srt", "application/x-subrip"); });
+  $("btnDoc").addEventListener("click", function () { if (haTexto()) baixar(htmlDoc(cur()), "doc", "application/msword"); });
+  $("btnPdf").addEventListener("click", function () {
     if (!haTexto()) return;
-    var d = new Date(), nome = "reuniao_" + d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "_" + pad(d.getHours()) + pad(d.getMinutes()) + ".txt";
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([textoPuro() + "\n"], { type: "text/plain;charset=utf-8" }));
-    a.download = nome; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    var w = window.open("", "_blank");
+    if (!w) { aviso("O navegador bloqueou a janela. Permita pop-ups ou use Baixar Word.", "erro"); return; }
+    w.document.write(htmlDoc(cur())); w.document.close(); w.focus(); setTimeout(function () { w.print(); }, 400);
   });
+
+  /* ---------- Apagar texto ---------- */
   $("btnLimpar").addEventListener("click", function () { if (rodando) { aviso("Pare a transcrição antes de limpar.", "atencao"); return; } $("confirma").hidden = false; });
   $("btnNao").addEventListener("click", function () { $("confirma").hidden = true; });
   $("btnSim").addEventListener("click", function () {
-    estado = { linhas: [], decorrido: 0 }; salvar(); $("confirma").hidden = true;
-    btnIniciar.textContent = "Iniciar transcrição"; desenhar(); tick(); aviso("Texto apagado.", "ok");
+    var m = cur(); m.linhas = []; m.decorrido = 0; salvar(); $("confirma").hidden = true;
+    desenhar(); tick(); aviso("Texto desta reunião apagado.", "ok");
   });
 
-  carregar(); desenhar(); tick();
-  if (estado.linhas.length) { btnIniciar.textContent = "Retomar transcrição"; aviso("Texto anterior recuperado deste aparelho.", "atencao"); }
-  if (!SR) { aviso("Este navegador não tem reconhecimento de voz. Abra no Chrome do Android.", "erro"); }
+  /* ---------- Início ---------- */
+  carregar(); cur(); montarModelos();
+  $("inpGlossario").value = S.glossario;
+  atualizarConfig(); desenharFalantes(); desenhar(); tick();
+  if (cur().linhas.length) { aviso("Texto anterior recuperado deste aparelho.", "atencao"); }
+  else if (!SR) { aviso("Este navegador não tem o reconhecimento do Chrome. Use o motor Whisper local ou abra no Chrome.", "atencao"); }
 })();
 </script>
 </body>
