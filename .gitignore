@@ -1,3 +1,4 @@
 pesquisa-plaud/
 __pycache__/
 reunioes/
+*.anterior

@@ -7,6 +7,8 @@ Programa de terminal (sem servidor). Lê o áudio que sai do app pelo PipeWire, 
 - Google Meet (no navegador): `./iniciar.sh --app meet` (pega Brave, Chrome, Edge, Firefox...)
 - Todo o som do computador: `./iniciar.sh --app sistema`
 - Outro app: `./iniciar.sh --app discord` (ou parte do nome do app)
+- Curso, aula ou treinamento de um dia inteiro: `./iniciar.sh --app sistema --curso` (capta qualquer app ou aba). Capítulos de 15 min, resumo maior, seção de conceitos e definições, ETL parcial salvo a cada hora em `parcial/`.
+- Sessão interrompida (queda de energia, fechou sem querer): `./iniciar.sh --recuperar ../reunioes/reuniao_AAAA-MM-DD_HHMM [--curso]` roda o ETL com o que já foi salvo (`linhas.jsonl`, gravado fala a fala).
 - Opções: `--modelo tiny|base|small|medium` (padrão small; tiny é mais rápido e erra mais), `--idioma pt|en|auto`, `--sem-mic`, `--titulo "..."`, `--limiar 0.008` (sensibilidade de voz).
 - Participantes = som do app; Eu = seu microfone. Use fones para o microfone não captar a caixa (o programa remove ecos parecidos no final).
 - Ctrl+C para parar. Saída em `../reunioes/reuniao_AAAA-MM-DD_HHMM/` (pasta e .zip do ETL; ignorada pelo git).

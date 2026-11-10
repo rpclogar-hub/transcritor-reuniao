@@ -1,0 +1,167 @@
+/* ==========================================================================
+   Design system "Palco": fundo azul-marinho, detalhe laranja, modo escuro/claro
+   Origem: modo palco do Metrônomo de Bateria (tela cheia). Valores medidos do original.
+   Uso: <div class="palco" id="palco"> ... </div>  (+ classe .claro para o modo claro)
+   Fonte: Inter 300-800 (Google Fonts). Fallback: Arial.
+   ========================================================================== */
+
+/* ---------- tokens: escuro é o padrão ---------- */
+.palco{
+  /* superfícies */
+  --pl-bg:#06071a;              /* fundo da tela */
+  --pl-surface:#12143a;         /* blocos, campos */
+  --pl-line:#23265a;            /* borda de bloco/campo, rodapé */
+  --pl-line-strong:#3a3d6e;     /* borda de botões redondos */
+  /* texto */
+  --pl-text:#ffffff;
+  --pl-muted:#9aa0c8;           /* rótulos, barra de topo */
+  --pl-soft:#cfd3f5;            /* texto de botão fantasma */
+  --pl-faint:#8e94bd;           /* botão discreto do rodapé */
+  --pl-dim:#5b6096;             /* número do bloco apagado */
+  /* marca */
+  --pl-blue:#1b1bf2;            /* batida/estado ativo comum */
+  --pl-blue-edge:#4c4cff;       /* borda do bloco azul aceso */
+  --pl-orange:#ff5100;          /* acento: só detalhe */
+  --pl-orange-light:#fb923c;    /* 2º tom do degradê, legenda "BPM", ícone do sol */
+  --pl-orange-edge:#ff8a4d;     /* borda do bloco laranja aceso */
+  --pl-grad:linear-gradient(90deg,#ff5100,#fb923c);
+  /* botões e campos (variam por tema) */
+  --pl-btn-border:#3a3d6e; --pl-btn-text:#cfd3f5; --pl-btn-bg:transparent;
+  --pl-seg-border:#3a3d6e; --pl-seg-text:#cfd3f5; --pl-seg-bg:transparent;
+  --pl-tile-bg:#12143a;   --pl-tile-border:#23265a; --pl-tile-text:#5b6096;
+  --pl-input-bg:#12143a;  --pl-input-border:#23265a; --pl-input-text:#fff;
+  --pl-foot-border:#23265a; --pl-foot-text:#8e94bd;
+  --pl-hover:#ffffff14;   --pl-dot:#3a3e78; --pl-dot-on:#fb923c;
+  --pl-tema-cor:#fb923c;
+  --fw:16px;                    /* espessura da moldura piscando: 6 / 10 / 16 */
+}
+/* ---------- modo claro: só troca os tokens ---------- */
+.palco.claro{
+  --pl-bg:#eef1ff; --pl-surface:#fff; --pl-line:#cbd4f1; --pl-line-strong:#cbd4f1;
+  --pl-text:#0e0f2c; --pl-muted:#4a5072;
+  --pl-blue-edge:#1b1bf2; --pl-orange-edge:#ff5100;
+  --pl-btn-border:#cbd4f1; --pl-btn-text:#1b1bf2; --pl-btn-bg:#fff;
+  --pl-seg-border:#1b1bf2; --pl-seg-text:#1b1bf2; --pl-seg-bg:#fff;
+  --pl-tile-bg:#fff; --pl-tile-border:#cbd4f1; --pl-tile-text:#4a5072;
+  --pl-input-bg:#fff; --pl-input-border:#cbd4f1; --pl-input-text:#0e0f2c;
+  --pl-foot-border:#cbd4f1; --pl-foot-text:#4a5072;
+  --pl-hover:#e9edff; --pl-dot:#c3cbea; --pl-dot-on:#ff5100;
+  --pl-tema-cor:#1b1bf2;
+}
+
+/* ---------- base ---------- */
+:where(.palco,.palco *){box-sizing:border-box;margin:0;padding:0}   /* :where = força zero: não vence os componentes */
+.palco{
+  position:fixed;inset:0;z-index:100;
+  display:flex;flex-direction:column;justify-content:space-between;gap:12px;
+  padding:16px 20px;overflow-y:auto;
+  font-family:"Inter",Arial,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;
+  background:var(--pl-bg);color:var(--pl-text);
+}
+:where(.palco button){font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+.palco :focus-visible{outline:3px solid var(--pl-orange-light);outline-offset:3px}
+.palco[hidden]{display:none}
+
+/* moldura que pisca: laranja no acento, azul nos demais (acende ~110 ms) */
+.palco.f1{box-shadow:inset 0 0 0 var(--fw) var(--pl-orange)}
+.palco.f{box-shadow:inset 0 0 0 var(--fw) var(--pl-blue)}
+
+/* ---------- barra do topo ---------- */
+.p-top{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  color:var(--pl-muted);font-size:.8rem;font-weight:800;letter-spacing:.11em;text-transform:uppercase}
+.p-top span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-acts{display:flex;align-items:center;gap:8px;flex:none}
+.p-sair{border:1px solid var(--pl-btn-border);border-radius:999px;padding:10px 20px;
+  color:var(--pl-btn-text);font-weight:700;background:var(--pl-btn-bg)}
+.p-tema{width:36px;height:36px;border-radius:50%;border:1px solid var(--pl-btn-border);
+  color:var(--pl-tema-cor);background:var(--pl-btn-bg);display:grid;place-items:center;padding:0}
+.p-tema .lua{display:none}
+.palco.claro .p-tema .sol{display:none}.palco.claro .p-tema .lua{display:block}
+
+/* ---------- controle segmentado (pílulas) ---------- */
+.seg{display:flex;gap:8px;flex-wrap:nowrap}
+.seg button{flex:1;padding:9px 4px;font-size:.82rem;font-weight:700;white-space:nowrap;
+  border:1px solid var(--pl-seg-border);border-radius:999px;color:var(--pl-seg-text);background:var(--pl-seg-bg)}
+.seg button:hover{background:var(--pl-hover)}
+.seg button[aria-pressed=true]{background:var(--pl-grad);border-color:transparent;color:#fff;
+  box-shadow:0 6px 18px #ff510040}
+
+/* ---------- número em destaque + slider + botão principal ---------- */
+.p-mid{text-align:center}
+.p-bpm{display:flex;align-items:center;justify-content:center;gap:clamp(12px,4vw,40px)}
+.p-bpm strong{font-size:clamp(3.2rem,min(15vw,12vh),8rem);font-weight:800;letter-spacing:-.07em;
+  line-height:1;font-variant-numeric:tabular-nums}
+.p-step{width:46px;height:46px;border-radius:50%;border:1px solid var(--pl-btn-border);
+  color:var(--pl-btn-text);background:var(--pl-btn-bg);font-size:1.6rem;font-weight:700}
+.p-mid small{display:block;color:var(--pl-orange-light);font-weight:800;letter-spacing:.2em;margin-top:2px}
+.p-mid input[type=range]{display:block;width:min(86vw,640px);height:32px;margin:6px auto 0;accent-color:var(--pl-orange)}
+.p-bot{display:flex;justify-content:center;margin-top:10px}
+.cta{padding:13px 34px;min-width:200px;border-radius:999px;font-weight:700;font-size:1.05rem;color:#fff;
+  background:var(--pl-grad);box-shadow:0 8px 24px #ff510033}
+.cta[data-on=true]{background:var(--pl-blue);box-shadow:none}   /* "Parar": azul, sem brilho */
+
+/* ---------- blocos indicadores (tiles) ---------- */
+.pfaixa{display:grid;grid-template-columns:repeat(var(--n,4),1fr);gap:10px;flex:1 1 60px;min-height:40px;max-height:150px}   /* --n = quantidade de blocos */
+.pfaixa i{position:relative;display:grid;place-items:center;border-radius:10px;border:2px solid var(--pl-tile-border);
+  background:var(--pl-tile-bg);color:var(--pl-tile-text);font-style:normal;font-weight:800;
+  font-size:clamp(1.6rem,4vw,3rem);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pfaixa i.ac{box-shadow:inset 0 5px 0 var(--pl-orange)}                /* marcador de acento (faixa no topo) */
+.pfaixa i.on{background:var(--pl-blue);border-color:var(--pl-blue-edge);color:#fff}
+.pfaixa i.on.um{background:var(--pl-orange);border-color:var(--pl-orange-edge)}
+/* pontinhos de subdivisão dentro do bloco */
+.sd{position:absolute;left:0;right:0;bottom:6px;display:flex;justify-content:center;gap:5px;pointer-events:none;font-style:normal}
+.sd u{display:block;width:6px;height:6px;border-radius:50%;background:var(--pl-dot);text-decoration:none}
+.sd u.on{background:var(--pl-dot-on)}
+.pfaixa i.on .sd u{background:#ffffff55}
+.pfaixa i.on .sd u.on{background:#fff}
+
+/* ---------- campos em grade ---------- */
+.p-opts{display:grid;gap:10px}
+.p-row{display:grid;gap:10px}
+.p-r2{grid-template-columns:1fr 1fr}
+.p-r3{grid-template-columns:repeat(3,1fr)}
+.p-r4{grid-template-columns:repeat(4,1fr);gap:6px}
+.p-o{display:flex;flex-direction:column;gap:5px;min-width:0}
+.p-o label{font-size:.62rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--pl-muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p-r4 .p-o label{font-size:.58rem;letter-spacing:.05em}
+.p-o select,.p-o input{width:100%;min-width:0;font:inherit;font-size:.9rem;padding:9px 10px;
+  border:1px solid var(--pl-input-border);border-radius:8px;background:var(--pl-input-bg);color:var(--pl-input-text)}
+.p-r4 .p-o select,.p-r4 .p-o input{padding-left:6px;padding-right:4px}
+.p-o select:disabled{opacity:.4}
+.p-rows-off{opacity:.4;pointer-events:none}                              /* grupo desligado */
+
+/* ---------- rodapé discreto ---------- */
+.p-foot{display:flex;justify-content:center}
+.p-foot button{padding:7px 16px;border:1px solid var(--pl-foot-border);border-radius:999px;
+  font-size:.75rem;font-weight:700;letter-spacing:.04em;color:var(--pl-foot-text);background:transparent}
+.p-foot button:hover{background:var(--pl-hover);color:var(--pl-soft)}
+.palco.claro .p-foot button:hover{color:var(--pl-text)}
+
+/* ---------- telas baixas: tudo cabe sem rolagem ---------- */
+@media(max-height:700px){
+  .palco{gap:8px;padding:10px 16px}
+  .p-sair{padding:7px 16px}
+  .p-tema{width:32px;height:32px}
+  .p-step{width:40px;height:40px}
+  .p-mid small{margin-top:0}
+  .p-mid input[type=range]{height:26px;margin-top:2px}
+  .p-bot{margin-top:6px}
+  .cta{padding:10px 30px}
+  .p-o select,.p-o input{padding:5px 8px;font-size:.85rem}
+}
+@media(max-height:660px){
+  .palco{gap:5px;padding:8px 14px}
+  .p-bpm strong{font-size:2.8rem}
+  .p-step{width:36px;height:36px;font-size:1.3rem}
+  .p-mid input[type=range]{height:20px}
+  .p-bot{margin-top:4px}
+  .cta{padding:8px 28px;font-size:.95rem}
+  .seg button{padding:7px 4px}
+  .p-sair{padding:5px 14px}
+  .p-tema{width:30px;height:30px}
+  .p-opts{gap:6px}.p-row{gap:8px}.p-o{gap:3px}
+  .p-foot button{padding:4px 14px}
+  .pfaixa{min-height:36px}
+}
+@media(prefers-reduced-motion:reduce){.palco *{animation:none!important;transition:none!important}}

@@ -122,14 +122,24 @@ def main():
     ap.add_argument("--modelo", default="small", help="tiny (mais rápido), base, small (padrão), medium (mais preciso, lento)")
     ap.add_argument("--idioma", default="pt", help="pt, en ou auto")
     ap.add_argument("--titulo", default="", help="título da reunião")
+    ap.add_argument("--curso", action="store_true", help="modo aula/curso/treinamento longo: capítulos de 15 min, resumo maior, ETL parcial a cada hora")
+    ap.add_argument("--recuperar", default="", help="pasta de uma sessão interrompida: roda só o ETL com o que já foi salvo")
     ap.add_argument("--limiar", type=float, default=0.008, help="sensibilidade de voz (menor = mais sensível)")
     a = ap.parse_args()
 
+    if a.recuperar:
+        pr = Path(a.recuperar).expanduser(); jl = pr / "linhas.jsonl"
+        if not jl.exists(): sys.exit(f"Não achei {jl}")
+        ls = [json.loads(x) for x in jl.read_text(encoding="utf-8").splitlines() if x.strip()]
+        if not ls: sys.exit("A sessão não tem falas salvas.")
+        ls.sort(key=lambda l: l["t"]); cr = datetime.fromtimestamp(jl.stat().st_ctime)
+        d, z, rel, est = etl.rodar_etl(a.titulo or f"Reunião recuperada {cr:%d/%m %H:%M}", cr, ls, ls[-1]["t"] + 5, "inglês" if a.idioma == "en" else "português do Brasil", "recuperada", pr / "reuniao_recuperada", a.curso)
+        print(f"ETL concluído: {est['palavras']} palavras.\nPasta: {d}\nPacote: {z}"); return
     criada = datetime.now()
-    titulo = a.titulo or f"Reunião {criada:%d/%m %H:%M}"
+    titulo = a.titulo or (f"Curso {criada:%d/%m %H:%M}" if a.curso else f"Reunião {criada:%d/%m %H:%M}")
     pasta = RAIZ / "reunioes" / f"reuniao_{criada:%Y-%m-%d_%H%M}"
     pasta.mkdir(parents=True, exist_ok=True)
-    arq_txt = pasta / "transcricao-ao-vivo.txt"
+    arq_txt = pasta / "transcricao-ao-vivo.txt"; arq_jl = pasta / "linhas.jsonl"
     gloss = []
     gp = AQUI / "glossario.txt"
     if gp.exists():
@@ -187,13 +197,22 @@ def main():
             with lock:
                 linhas.append({"t": round(ini, 1), "f": tag, "s": txt, "k": "fala"})
                 with arq_txt.open("a", encoding="utf-8") as fh: fh.write(f"[{hhmmss(ini)}] {tag}: {txt}\n")
+                with arq_jl.open("a", encoding="utf-8") as fj: fj.write(json.dumps(linhas[-1], ensure_ascii=False) + "\n")
             print(f"[{hhmmss(ini)}] {tag}: {txt}", flush=True)
 
     th = threading.Thread(target=worker); th.start()
     signal.signal(signal.SIGTERM, lambda *_: parar.set())
     signal.signal(signal.SIGINT, lambda *_: parar.set())
     try:
-        while not parar.is_set(): time.sleep(0.3)
+        ultimo_parcial = time.monotonic()
+        while not parar.is_set():
+            time.sleep(0.3)
+            if a.curso and time.monotonic() - ultimo_parcial >= 3600:      # ETL parcial de hora em hora (segurança em sessões longas)
+                ultimo_parcial = time.monotonic()
+                with lock: copia = sorted(linhas, key=lambda l: l["t"])
+                if copia:
+                    try: etl.rodar_etl(titulo + " (parcial)", criada, copia, time.monotonic() - t0, "português do Brasil", origem, pasta / "parcial", True); print("   (ETL parcial salvo em 'parcial/')", flush=True)
+                    except Exception as e: print(f"   (ETL parcial falhou: {e})", flush=True)
     except KeyboardInterrupt:
         pass
     print("\nParando... terminando o último trecho.", flush=True)
@@ -212,7 +231,7 @@ def main():
     linhas = [l for l in linhas if l["f"] != "Eu" or not any(abs(l["t"] - p["t"]) < 12 and difflib.SequenceMatcher(None, l["s"].lower(), p["s"].lower()).ratio() >= 0.55 for p in part)]
     if len(linhas) < antes: print(f"   ({antes - len(linhas)} linha(s) do microfone removidas por serem eco do som da reunião; use fones ou --sem-mic)", flush=True)
     print("Rodando o ETL...", flush=True)
-    dest, z, rel, est = etl.rodar_etl(titulo, criada, linhas, dur, "inglês" if a.idioma == "en" else "português do Brasil", origem, pasta / f"reuniao_{criada:%Y-%m-%d_%H%M}")
+    dest, z, rel, est = etl.rodar_etl(titulo, criada, linhas, dur, "inglês" if a.idioma == "en" else "português do Brasil", origem, pasta / f"reuniao_{criada:%Y-%m-%d_%H%M}", a.curso)
     print(f"\nETL concluído: {est['palavras']} palavras, {est['tarefas']} tarefas, {est['decisoes']} decisões, {est['perguntas']} perguntas.\nPasta: {dest}\nPacote: {z}\n")
 
 if __name__ == "__main__":

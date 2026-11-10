@@ -16,6 +16,7 @@ def W(src):
 RE_ACAO = W(r"vou|vamos (?:enviar|mandar|ligar|agendar|marcar|revisar|verificar|preparar|fechar|confirmar|fazer|criar|definir|resolver)|preciso|precisamos|tenho que|temos que|tem que|fica combinado|ficou combinado|fico de|ficamos de|pode (?:enviar|mandar|ligar|revisar|verificar|agendar)|(?:enviar|mandar|ligar|agendar|marcar|revisar|verificar|preparar|fechar|confirmar) (?:o|a|os|as|um|uma|para|pra|com)|prazo|i will|i'll|we will|we'll|we need to|i need to|let's|action item|deadline|follow up|next step|próximo passo|próximos passos")
 RE_DECISAO = W(r"decidimos|ficou decidido|decidiu-se|decidido|aprovado|aprovamos|fechado|combinado|vamos (?:com|usar|adotar|seguir|optar|contratar|lançar)|we decided|we agreed|agreed|approved|decision|the decision")
 RE_RISCO = W(rf"risco|problema|bloqueio|bloqueado|atraso|atrasar|atrasado|preocupa{L}*|dificuldade|impedimento|risk|blocker|blocked|delay|delayed|issue|concern")
+RE_DEF = W(r"(?:é|são|foi|era) (?:um|uma|o|a|os|as) (?:\w+ ){0,4}(?:que|de|para|onde|quando)|significa|quer dizer|chamamos de|chama-se|chamado de|define-se|ou seja|conceito de|definição de|means|is defined as|refers to|in other words")
 RE_PRAZO = W(rf"hoje|amanhã|depois de amanhã|(?:dia|até) \d{{1,2}}(?:/\d{{1,2}})?|\d{{1,2}}/\d{{1,2}}(?:/\d{{2,4}})?|semana que vem|próxima semana|fim do mês|final do mês|fim da semana|até (?:{DIAS})|(?:na |nesta |nessa |próxima |proxima )?(?:{DIAS})|today|tomorrow|next week|end of (?:the )?(?:day|week|month)|by (?:{DIAS})")
 
 def hhmmss(s):
@@ -63,7 +64,7 @@ def extrair(linhas, decorrido):
     return {"segmentos": segs, "notas": [{"t": l["t"], "texto": l["s"]} for l in ord_ if l.get("k") == "nota"],
             "marcados": [l["t"] for l in ord_ if l.get("k") == "dest"]}
 
-def transformar(ex, decorrido):
+def transformar(ex, decorrido, cap_seg=300, max_resumo=6):
     segs, ant = [], ""
     for sg in ex["segmentos"]:
         c = limpar(sg["texto_original"])
@@ -116,6 +117,7 @@ def transformar(ex, decorrido):
     riscos = [{"n": i+1, "tempo": hhmmss(x["t"]), "falante": x["falante"], "trecho": x["texto"]} for i, x in enumerate(quais(RE_RISCO))]
     perguntas = [{"n": i+1, "tempo": hhmmss(x["t"]), "falante": x["falante"], "pergunta": x["texto"]} for i, x in enumerate([x for x in sents if x["texto"].endswith("?") and npal(x["texto"]) >= 3])]
 
+    conceitos = [{"n": i+1, "tempo": hhmmss(x["t"]), "falante": x["falante"], "trecho": x["texto"]} for i, x in enumerate(x for x in sents if RE_DEF.search(x["texto"]) and npal(x["texto"]) >= 6)]
     pont = []
     for i, x in enumerate(sents):
         ps = palavras(x["texto"]); sc = sum(freq.get(w, 0) for w in ps) / max(len(ps), 1) ** .5
@@ -124,12 +126,12 @@ def transformar(ex, decorrido):
         if RE_ACAO.search(x["texto"]): sc *= 1.2
         if npal(x["texto"]) < 5: sc *= .3
         pont.append((sc, i, x))
-    n_res = min(6, max(2, round(len(sents) / 8)))
+    n_res = min(max_resumo, max(2, round(len(sents) / 8)))
     resumo = [x["texto"] for _, _, x in sorted(sorted(pont, key=lambda p: -p[0])[:n_res], key=lambda p: p[1])]
 
     caps, cur = [], None
     for u in turnos:
-        if cur is None or u["inicio"] - cur["inicio"] >= 300 or u["inicio"] - cur["fim"] > 90:
+        if cur is None or u["inicio"] - cur["inicio"] >= cap_seg or u["inicio"] - cur["fim"] > 90:
             cur = {"inicio": u["inicio"], "fim": u["fim"], "textos": [], "falantes": {}}; caps.append(cur)
         cur["fim"] = u["fim"]; cur["textos"].append(u["texto"]); cur["falantes"][u["falante"]] = 1
     capitulos = []
@@ -148,10 +150,10 @@ def transformar(ex, decorrido):
     dur = max(decorrido, segs[-1]["fim"] if segs else 0); totp = sum(s["palavras"] for s in segs)
     estat = {"duracao": hhmmss(dur), "segmentos_brutos": len(ex["segmentos"]), "segmentos_limpos": len(segs), "descartados_na_limpeza": len(ex["segmentos"]) - len(segs),
              "turnos": len(turnos), "palavras": totp, "palavras_por_minuto": round(totp / (dur / 60)) if dur > 0 else 0, "frases": len(sents),
-             "tarefas": len(tarefas), "decisoes": len(decisoes), "riscos": len(riscos), "perguntas": len(perguntas),
+             "tarefas": len(tarefas), "conceitos": len(conceitos), "decisoes": len(decisoes), "riscos": len(riscos), "perguntas": len(perguntas),
              "destaques": len(ex["marcados"]) + sum(1 for s in segs if s["destaque"]), "notas": len(ex["notas"])}
     return {"segmentos": segs, "turnos": turnos, "frases": sents, "palavras_chave": chaves, "termos_compostos": compostos, "entidades": ent, "tarefas": tarefas,
-            "decisoes": decisoes, "riscos": riscos, "perguntas": perguntas, "resumo": resumo, "capitulos": capitulos, "falantes": falantes, "estatisticas": estat}
+            "decisoes": decisoes, "riscos": riscos, "perguntas": perguntas, "conceitos": conceitos, "resumo": resumo, "capitulos": capitulos, "falantes": falantes, "estatisticas": estat}
 
 def lista(itens, f): return "\n".join(f(i) for i in itens) if itens else "- (nada encontrado)"
 
@@ -165,6 +167,7 @@ def relatorio(titulo, criada, T, ex):
         "## Resumo automático", lista(T["resumo"], lambda x: "- " + x), "",
         "## Decisões", lista(T["decisoes"], lambda x: f"- [{x['tempo']}] " + (x["falante"] + ": " if x["falante"] != "Não identificado" else "") + x["decisao"]), "",
         "## Tarefas e próximos passos", lista(T["tarefas"], lambda x: f"- [{x['tempo']}] {x['acao']} (responsável: {x['responsavel']}; prazo: {x['prazo']})"), "",
+        "## Conceitos e definições (útil em aulas e cursos)", lista(T["conceitos"], lambda x: f"- [{x['tempo']}] {x['trecho']}"), "",
         "## Riscos e problemas citados", lista(T["riscos"], lambda x: f"- [{x['tempo']}] {x['trecho']}"), "",
         "## Perguntas em aberto", lista(T["perguntas"], lambda x: f"- [{x['tempo']}] {x['pergunta']}"), "",
         "## Capítulos", lista(T["capitulos"], lambda c: f"- {c['inicio']} a {c['fim']}: {c['temas'] or 'sem tema claro'}" + (f". Começa com: \"{c['abertura']}\"" if c["abertura"] else "")), "",
@@ -214,9 +217,9 @@ def markdown(titulo, cab, linhas):
         return f"- [{hhmmss(l['t'])}] {'★ ' if l.get('d') else ''}{'**' + l['f'] + ':** ' if l.get('f') else ''}{l['s']}"
     return f"# {titulo}\n\n{cab}\n\n" + "\n".join(f(l) for l in linhas) + "\n"
 
-def rodar_etl(titulo, criada, linhas, decorrido, idioma, fonte, destino):
+def rodar_etl(titulo, criada, linhas, decorrido, idioma, fonte, destino, curso=False):
     """Roda E, T e L e grava tudo em destino (pasta + .zip). Devolve (pasta, zip, relatorio)."""
-    ex = extrair(linhas, decorrido); T = transformar(ex, decorrido)
+    ex = extrair(linhas, decorrido); T = transformar(ex, decorrido, 900 if curso else 300, 30 if curso else 6)
     rel = relatorio(titulo, criada, T, ex)
     cab = f"Reunião: {titulo} · Data: {criada:%d/%m/%Y} · Duração aproximada: {T['estatisticas']['duracao']} · Idioma falado: {idioma}"
     dados = {"esquema": "reuniao-etl-v1", "gerado_em": datetime.now().isoformat(timespec="seconds"),
@@ -232,6 +235,7 @@ def rodar_etl(titulo, criada, linhas, decorrido, idioma, fonte, destino):
         "csv/segmentos.csv": C(T["segmentos"], [("id","id"),("inicio","inicio_s"),("fim","fim_s"),("falante","falante"),("texto","texto"),("texto_original","texto_original"),("destaque","destaque"),("palavras","palavras")]),
         "csv/tarefas.csv": C(T["tarefas"], [("n","n"),("tempo","tempo"),("responsavel","responsavel"),("acao","acao"),("prazo","prazo"),("marcada","marcada_com_estrela")]),
         "csv/decisoes.csv": C(T["decisoes"], [("n","n"),("tempo","tempo"),("falante","falante"),("decisao","decisao")]),
+        "csv/conceitos.csv": C(T["conceitos"], [("n","n"),("tempo","tempo"),("falante","falante"),("trecho","trecho")]),
         "csv/riscos.csv": C(T["riscos"], [("n","n"),("tempo","tempo"),("falante","falante"),("trecho","trecho")]),
         "csv/perguntas.csv": C(T["perguntas"], [("n","n"),("tempo","tempo"),("falante","falante"),("pergunta","pergunta")]),
         "csv/entidades.csv": C(T["entidades"], [("tipo","tipo"),("valor","valor"),("ocorrencias","ocorrencias"),("primeira_vez","primeira_vez_s")]),
