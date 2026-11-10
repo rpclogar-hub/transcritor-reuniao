@@ -10,4 +10,5 @@ Página web (GitHub Pages, sem servidor, sem chave de API, sem custo) que transc
 - Recursos: destaques ★, notas digitadas, falantes manuais, glossário, várias reuniões com busca/lixeira/mesclar.
 - Saída: modelos de instruções para colar no Claude (ata, vendas, entrevista, aula, mapa mental, tarefas, perguntar) e exportação TXT/MD/SRT/Word/PDF.
 - Limites: app Zoom instalado não é captado (use o Zoom Web, zoom.us/wc); no Linux/Mac só áudio de aba; use fones para o microfone não captar a caixa; celular não captura áudio interno; sem separação automática de falantes.
+- Para o app Zoom instalado e o Meet com captura do sistema (Linux): `captura-local/` (terminal, PipeWire + Whisper local, ETL ao parar). Ver `captura-local/LEIA-ME.md`.
 - Manual de uso: manual.html (também em /manual.html no site).

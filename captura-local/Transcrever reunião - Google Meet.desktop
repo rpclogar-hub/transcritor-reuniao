@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Transcrever reunião - Google Meet
+Exec=bash -c 'cd "/home/rpc/Claude/@.artifacts/plaud-note-online-transcricao-de-audio/captura-local" && ./iniciar.sh --app meet; echo; read -p "Enter para fechar"'
+Terminal=true
+Icon=audio-input-microphone
