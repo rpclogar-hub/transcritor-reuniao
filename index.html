@@ -98,8 +98,8 @@
       <label class="campo">De onde vem o áudio
         <select id="selFonte">
           <option value="mic">Microfone</option>
-          <option value="tela">Áudio do computador (aba/sistema)</option>
-          <option value="ambos">Computador + meu microfone</option>
+          <option value="tela">Áudio da reunião (aba do Meet, Zoom ou navegador)</option>
+          <option value="ambos">Reunião + meu microfone (separa Participantes e Eu)</option>
         </select>
       </label>
       <label class="campo">Motor de transcrição
@@ -109,6 +109,9 @@
         </select>
       </label>
     </div>
+    <label class="campo" id="campoVel">Velocidade do Whisper
+      <select id="selVel"></select>
+    </label>
     <p class="ajuda" id="ajudaFonte"></p>
     <button class="principal iniciar" id="btnIniciar" type="button">Iniciar transcrição</button>
     <p id="aviso" role="status" aria-live="polite"></p>
@@ -157,6 +160,18 @@
       <button id="btnDoc" type="button">Baixar Word (.doc)</button>
       <button class="largo" id="btnPdf" type="button">PDF (imprimir / salvar como PDF)</button>
     </div>
+  </section>
+
+  <section class="card painel" aria-label="ETL">
+    <h2>Processo ETL da reunião</h2>
+    <p class="ajuda">Roda sozinho ao parar a transcrição. <b>Extrai</b> as falas com horário e falante, <b>trata</b> (limpa vícios e repetições, junta turnos, acha decisões, tarefas, riscos, perguntas, nomes, valores, datas, palavras-chave, capítulos e participação) e <b>carrega</b> tudo em um pacote .zip (relatório, base de conhecimento, JSON e planilhas CSV). Tudo no seu navegador.</p>
+    <div class="grade">
+      <button id="btnEtl" type="button">Rodar ETL agora</button>
+      <button id="btnEtlZip" type="button" class="principal" style="min-height:48px;font-size:1rem" disabled>Baixar pacote (.zip)</button>
+      <button id="btnEtlJson" type="button" disabled>Baixar JSON</button>
+      <button id="btnEtlCopiar" type="button" disabled>Copiar relatório</button>
+    </div>
+    <div id="etlSaida" class="ajuda" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:50vh;overflow-y:auto">Ainda não rodou.</div>
   </section>
 
   <section class="card" aria-label="Reuniões">
@@ -264,7 +279,7 @@
   var TEM_TELA = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) && !CELULAR;
 
   /* ---------- Estado e persistência ---------- */
-  var S = { atual: null, reunioes: [], glossario: "", falantes: [], cfg: { lang: "pt-BR", fonte: "mic", motor: "chrome", falante: "" } };
+  var S = { atual: null, reunioes: [], glossario: "", falantes: [], cfg: { lang: "pt-BR", fonte: "mic", motor: "chrome", falante: "", vel: "rapido" } };
   var rodando = false, parcial = "", ultimoFinal = "", rec = null;
   var inicioSessao = 0, base = 0, relogio = null, wake = null;
 
@@ -327,12 +342,12 @@
   }
   function segAgora() { return base + (rodando ? (Date.now() - inicioSessao) / 1000 : 0); }
 
-  function addLinha(txt, t, k) {
+  function addLinha(txt, t, k, quem) {
     txt = txt.replace(/\s+/g, " ").trim();
     if (!txt && k !== "dest") return;
     if (k !== "nota" && k !== "dest") txt = aplicarGlossario(cap(txt));
     var m = cur();
-    m.linhas.push({ t: t == null ? segAgora() : t, s: txt, f: (k === "nota" || k === "dest") ? "" : S.cfg.falante, k: k || "fala" });
+    m.linhas.push({ t: t == null ? segAgora() : t, s: txt, f: (k === "nota" || k === "dest") ? "" : (quem || S.cfg.falante), k: k || "fala" });
     m.decorrido = Math.max(m.decorrido, segAgora());
     salvar();
   }
@@ -372,6 +387,7 @@
     elTexto.scrollTop = elTexto.scrollHeight;
     var c = contarPalavras(m);
     elPalavras.textContent = c + (c === 1 ? " palavra" : " palavras");
+    desenharEtl();
     btnIniciar.textContent = rodando ? "Parar transcrição" : (m.linhas.length ? "Retomar transcrição" : "Iniciar transcrição");
   }
 
@@ -421,69 +437,81 @@
     ultimoFinal = txt; addLinha(txt);
   }
 
-  /* ---------- Motor 2: Whisper local (qualquer fonte de áudio) ---------- */
-  var asr = null, carregandoModelo = null, actx = null, proc = null, fluxos = [], pedacos = [], tam = 0,
-      silencio = 0, iniPedaco = 0, fila = Promise.resolve(), pendentes = 0;
+  /* ---------- Motor 2: Whisper local (qualquer fonte de áudio, quase em tempo real) ---------- */
+  // Velocidade: pedaços menores e modelo menor = texto aparece mais rápido; pedaços maiores e modelo maior = mais preciso.
+  var VEL = {
+    rapido:      { nome: "Tempo real (rápido)",   min: 2.5, pausa: 0.5, max: 8,  modelo: "Xenova/whisper-tiny" },
+    equilibrado: { nome: "Equilibrado",            min: 5,   pausa: 0.7, max: 15, modelo: "Xenova/whisper-base" },
+    preciso:     { nome: "Preciso (mais lento)",   min: 8,   pausa: 0.9, max: 25, modelo: "Xenova/whisper-small" }
+  };
+  var asrs = {}, carregando = {}, actx = null, fluxos = [], segs = [], fila = Promise.resolve(), pendentes = 0;
 
-  function carregarModelo() {
-    if (asr) return Promise.resolve(asr);
-    if (carregandoModelo) return carregandoModelo;
-    aviso("Baixando o modelo de voz (só na primeira vez, ~80 MB)...", "atencao");
-    carregandoModelo = import(URL_TRANSFORMERS).then(function (mod) {
-      return mod.pipeline("automatic-speech-recognition", MODELO_WHISPER, {
+  function velAtual() { return VEL[S.cfg.vel] || VEL.rapido; }
+  function carregarModelo(nome) {
+    if (asrs[nome]) return Promise.resolve(asrs[nome]);
+    if (carregando[nome]) return carregando[nome];
+    aviso("Baixando o modelo de voz (só na primeira vez; fica guardado no navegador)...", "atencao");
+    carregando[nome] = import(URL_TRANSFORMERS).then(function (mod) {
+      return mod.pipeline("automatic-speech-recognition", nome, {
         progress_callback: function (p) { if (p && p.status === "progress" && rodando) { aviso("Baixando modelo de voz: " + Math.round(p.progress) + "%", "atencao"); } }
       });
-    }).then(function (p) { asr = p; if (rodando) aviso("Modelo pronto. Transcrevendo (aparece alguns segundos depois da fala).", "ok"); return p; })
-      .catch(function (e) { carregandoModelo = null; throw e; });
-    return carregandoModelo;
+    }).then(function (p) { asrs[nome] = p; if (rodando) aviso("Modelo pronto. O texto aparece poucos segundos depois da fala.", "ok"); return p; })
+      .catch(function (e) { carregando[nome] = null; throw e; });
+    return carregando[nome];
   }
 
   var ALUCINACOES = /^(obrigad[oa][.!]?|legendas? pela comunidade.*|thanks for watching[.!]?|thank you[.!]?|you|\.+|\[.*\]|\(.*\)|♪.*)$/i;
 
-  function enviarPedaco() {
-    if (!tam) return;
-    var dados = new Float32Array(tam), o = 0;
-    pedacos.forEach(function (b) { dados.set(b, o); o += b.length; });
-    var t0 = iniPedaco; pedacos = []; tam = 0; silencio = 0;
-    if (dados.length < TAXA * 1.0) return;
+  function novoSeg(tag) { return { tag: tag, pedacos: [], tam: 0, silencio: 0, ini: 0 }; }
+
+  function enviarPedaco(sg) {
+    if (!sg.tam) return;
+    var dados = new Float32Array(sg.tam), o = 0;
+    sg.pedacos.forEach(function (b) { dados.set(b, o); o += b.length; });
+    var t0 = sg.ini, tag = sg.tag, nomeModelo = velAtual().modelo;
+    sg.pedacos = []; sg.tam = 0; sg.silencio = 0;
+    if (dados.length < TAXA * 0.8) return;
     pendentes++;
-    if (pendentes > 3) aviso("A transcrição está atrasada em relação à fala. Troque para o motor Chrome se for só microfone.", "atencao");
+    if (pendentes > 3) aviso("A transcrição está atrasada em relação à fala. Troque a velocidade para \"Tempo real\" ou use o motor Chrome se for só microfone.", "atencao");
     var lang = S.cfg.lang === "en-US" ? "english" : "portuguese";
-    fila = fila.then(function () { return carregarModelo(); }).then(function (m) {
+    fila = fila.then(function () { return carregarModelo(nomeModelo); }).then(function (m) {
       return m(dados, { language: lang, task: "transcribe" });
     }).then(function (r) {
       var txt = ((r && r.text) || "").trim();
-      if (txt && !ALUCINACOES.test(txt)) { addLinha(txt, t0); desenhar(); }
+      if (txt && !ALUCINACOES.test(txt)) { addLinha(txt, t0, "fala", tag); desenhar(); }
     }).catch(function (e) {
       aviso("Falha no Whisper: " + (e && e.message ? e.message : e), "erro");
     }).then(function () { pendentes--; });
   }
 
-  function aoReceberAudio(ev) {
-    var entrada = ev.inputBuffer.getChannelData(0), n = entrada.length, soma = 0, i;
+  function aoReceberAudio(sg, ev) {
+    var entrada = ev.inputBuffer.getChannelData(0), n = entrada.length, soma = 0, i, v = velAtual();
     for (i = 0; i < n; i++) soma += entrada[i] * entrada[i];
     var rms = Math.sqrt(soma / n), falando = rms > 0.012;
-    if (!tam && !falando) return;                      // descarta silêncio inicial
-    if (!tam) iniPedaco = segAgora();
-    pedacos.push(new Float32Array(entrada)); tam += n;
-    silencio = falando ? 0 : silencio + n;
-    if ((tam >= TAXA * 6 && silencio >= TAXA * 0.7) || tam >= TAXA * 20) enviarPedaco();
+    if (!sg.tam && !falando) return;                   // descarta silêncio inicial
+    if (!sg.tam) sg.ini = segAgora();
+    sg.pedacos.push(new Float32Array(entrada)); sg.tam += n;
+    sg.silencio = falando ? 0 : sg.silencio + n;
+    if ((sg.tam >= TAXA * v.min && sg.silencio >= TAXA * v.pausa) || sg.tam >= TAXA * v.max) enviarPedaco(sg);
   }
 
+  // Devolve [{ stream, tag }]. Com "Reunião + meu microfone", cada fonte vira um falante automático.
   async function abrirFluxos() {
-    var lista = [];
-    if (S.cfg.fonte === "mic" || S.cfg.fonte === "ambos") {
-      lista.push(await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }));
+    var lista = [], ambos = S.cfg.fonte === "ambos";
+    if (S.cfg.fonte === "mic" || ambos) {
+      lista.push({ stream: await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }), tag: ambos ? "Eu" : "" });
     }
-    if (S.cfg.fonte === "tela" || S.cfg.fonte === "ambos") {
-      var tela = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+    if (S.cfg.fonte === "tela" || ambos) {
+      var tela;
+      try { tela = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true }); }
+      catch (e) { lista.forEach(function (x) { x.stream.getTracks().forEach(function (t) { t.stop(); }); }); throw e; }
       tela.getVideoTracks().forEach(function (t) { t.stop(); });   // só o áudio interessa
       if (!tela.getAudioTracks().length) {
-        lista.forEach(function (s) { s.getTracks().forEach(function (t) { t.stop(); }); });
+        lista.forEach(function (x) { x.stream.getTracks().forEach(function (t) { t.stop(); }); });
         throw new Error("sem-audio-tela");
       }
       tela.getAudioTracks()[0].addEventListener("ended", function () { if (rodando) { aviso("O compartilhamento de áudio foi encerrado.", "atencao"); parar(false); } });
-      lista.push(tela);
+      lista.push({ stream: tela, tag: ambos ? "Participantes" : "" });
     }
     return lista;
   }
@@ -491,19 +519,24 @@
   async function iniciarWhisper() {
     fluxos = await abrirFluxos();
     actx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: TAXA });
-    proc = actx.createScriptProcessor(4096, 1, 1);
-    proc.onaudioprocess = aoReceberAudio;
-    fluxos.forEach(function (f) { actx.createMediaStreamSource(f).connect(proc); });
-    proc.connect(actx.destination);                    // necessário para o processador funcionar; sem eco (a entrada não é repassada)
-    pedacos = []; tam = 0; silencio = 0;
-    carregarModelo().catch(function (e) { aviso("Não consegui baixar o modelo de voz: " + (e && e.message ? e.message : e), "erro"); });
+    segs = [];
+    fluxos.forEach(function (f) {
+      var sg = novoSeg(f.tag), p = actx.createScriptProcessor(4096, 1, 1);
+      sg.proc = p; segs.push(sg);
+      p.onaudioprocess = function (ev) { aoReceberAudio(sg, ev); };
+      actx.createMediaStreamSource(f.stream).connect(p);
+      p.connect(actx.destination);                     // necessário para o processador funcionar; sem eco (a entrada não é repassada)
+    });
+    carregarModelo(velAtual().modelo).catch(function (e) { aviso("Não consegui baixar o modelo de voz: " + (e && e.message ? e.message : e), "erro"); });
   }
   function pararWhisper() {
-    try { enviarPedaco(); } catch (e) {}
-    try { if (proc) { proc.disconnect(); proc.onaudioprocess = null; } } catch (e) {}
+    segs.forEach(function (sg) {
+      try { enviarPedaco(sg); } catch (e) {}
+      try { sg.proc.disconnect(); sg.proc.onaudioprocess = null; } catch (e) {}
+    });
     try { if (actx) actx.close(); } catch (e) {}
-    fluxos.forEach(function (f) { f.getTracks().forEach(function (t) { t.stop(); }); });
-    proc = null; actx = null; fluxos = [];
+    fluxos.forEach(function (f) { f.stream.getTracks().forEach(function (t) { t.stop(); }); });
+    actx = null; fluxos = []; segs = [];
   }
 
   /* ---------- Iniciar / parar ---------- */
@@ -531,7 +564,7 @@
       } else {
         aviso("Iniciando...", "atencao");
         await iniciarWhisper();
-        if (!asr) aviso("Preparando o modelo de voz...", "atencao");
+        if (!asrs[velAtual().modelo]) aviso("Preparando o modelo de voz...", "atencao");
       }
     } catch (e) {
       rodando = false; raiz.classList.remove("gravando"); pararWhisper();
@@ -559,14 +592,16 @@
     raiz.classList.remove("gravando");
     elEstado.textContent = "Parado"; travarConfig(false); desenhar();
     if (!porErro) aviso(pendentes ? "Parado. Ainda terminando de transcrever o último trecho..." : "Parado. O texto está salvo neste aparelho.", "ok");
+    fila.then(function () { desenhar(); if (!rodando) rodarEtl(true); });   // ETL automático depois do último trecho
   }
   btnIniciar.addEventListener("click", function () { rodando ? parar(false) : iniciar(); });
 
   /* ---------- Configurações (idioma, fonte, motor) ---------- */
-  function travarConfig(sim) { ["selIdioma", "selFonte", "selMotor"].forEach(function (id) { $(id).disabled = sim; }); }
+  function travarConfig(sim) { ["selIdioma", "selFonte", "selMotor", "selVel"].forEach(function (id) { $(id).disabled = sim; }); }
   function atualizarConfig() {
     var cfg = S.cfg;
-    $("selIdioma").value = cfg.lang; $("selFonte").value = cfg.fonte; $("selMotor").value = cfg.motor;
+    $("selIdioma").value = cfg.lang; $("selFonte").value = cfg.fonte; $("selMotor").value = cfg.motor; $("selVel").value = cfg.vel;
+    $("campoVel").hidden = cfg.motor !== "whisper";
     var optsFonte = $("selFonte").options;
     for (var i = 0; i < optsFonte.length; i++) { if (optsFonte[i].value !== "mic") optsFonte[i].disabled = !TEM_TELA; }
     if (!TEM_TELA && cfg.fonte !== "mic") { cfg.fonte = "mic"; $("selFonte").value = "mic"; }
@@ -575,7 +610,7 @@
     if (!SR && cfg.motor === "chrome") { cfg.motor = "whisper"; $("selMotor").value = "whisper"; }
     var ajuda = "";
     if (CELULAR) ajuda = "No celular só o microfone está disponível. Para chamadas, coloque no alto-falante.";
-    else if (cfg.fonte !== "mic") ajuda = "Vai abrir a janela de compartilhamento: escolha a aba (ou a tela, no Windows) e marque \"Compartilhar áudio\".";
+    else if (cfg.fonte !== "mic") ajuda = "Ao iniciar, o Chrome abre a janela de compartilhamento: escolha a ABA do Google Meet, do Zoom Web (zoom.us/wc) ou de qualquer site e marque \"Compartilhar áudio da guia\". No Linux e no Mac só vale áudio de aba (não do sistema inteiro); o app Zoom instalado não é captado, entre pelo Zoom Web. Use fones para o microfone não captar o som da caixa." + (cfg.fonte === "ambos" ? " Com os dois, as falas saem como \"Participantes\" (aba) e \"Eu\" (microfone)." : "");
     else if (cfg.motor === "whisper") ajuda = "Whisper local: o áudio é processado só neste navegador. A primeira vez baixa ~80 MB.";
     $("ajudaFonte").textContent = ajuda;
     salvar();
@@ -583,6 +618,8 @@
   $("selIdioma").addEventListener("change", function () { S.cfg.lang = this.value; atualizarConfig(); });
   $("selFonte").addEventListener("change", function () { S.cfg.fonte = this.value; atualizarConfig(); });
   $("selMotor").addEventListener("change", function () { S.cfg.motor = this.value; atualizarConfig(); });
+  $("selVel").addEventListener("change", function () { S.cfg.vel = this.value; atualizarConfig(); });
+  Object.keys(VEL).forEach(function (k) { var o = document.createElement("option"); o.value = k; o.textContent = VEL[k].nome; $("selVel").appendChild(o); });
 
   /* ---------- Destaque, nota, falantes ---------- */
   $("btnDestaque").addEventListener("click", function () { addLinha("", null, "dest"); desenhar(); aviso("Momento marcado.", "ok"); });
@@ -741,6 +778,267 @@
     if (!w) { aviso("O navegador bloqueou a janela. Permita pop-ups ou use Baixar Word.", "erro"); return; }
     w.document.write(htmlDoc(cur())); w.document.close(); w.focus(); setTimeout(function () { w.print(); }, 400);
   });
+
+  /* ---------- ETL completo: Extrair → Transformar → Carregar ---------- */
+  var STOP = ("a o as os um uma uns umas de do da dos das em no na nos nas por para com sem sob sobre entre até que se como mas mais menos muito muita muitos muitas já não sim também então assim aqui ali lá isso isto esse essa esses essas este esta estes estas aquele aquela eu tu ele ela nós vocês eles elas me te lhe meu minha seu sua nosso nossa dele dela ser estar ter haver fazer ir vai vou vamos foi era são está estão tem têm tinha ainda só pra pro pela pelo quando onde porque qual quais quem tudo todo toda todos todas cada outro outra outros outras coisa coisas gente tipo bom bem agora depois antes hoje ontem amanhã então pode podem posso podemos precisa precisamos fazendo falando falar disse acho achei sendo tendo ficar fica ficou fiz vez vezes dessa desse nesse nessa dessas desses também mesmo mesma sempre nunca ainda depois the and for are but not you all can had her was one our out has have been from they will with this that what when your said there their which would about into than them then these those just like very also here some such only over more most other could should").split(" ");
+  var STOPSET = {}; STOP.forEach(function (w) { STOPSET[w] = 1; });
+  var DIAS = "segunda|terça|quarta|quinta|sexta|sábado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday";
+  function W(src, flags) { return new RegExp("(?<![\\p{L}\\p{N}])(?:" + src + ")(?![\\p{L}\\p{N}])", flags || "iu"); }
+  var RE_ACAO = W("vou|vamos (?:enviar|mandar|ligar|agendar|marcar|revisar|verificar|preparar|fechar|confirmar|fazer|criar|definir|resolver)|preciso|precisamos|tenho que|temos que|tem que|fica combinado|ficou combinado|fico de|ficamos de|pode (?:enviar|mandar|ligar|revisar|verificar|agendar)|(?:enviar|mandar|ligar|agendar|marcar|revisar|verificar|preparar|fechar|confirmar) (?:o|a|os|as|um|uma|para|pra|com)|prazo|i will|i'll|we will|we'll|we need to|i need to|let's|action item|deadline|follow up|next step|próximo passo|próximos passos");
+  var RE_DECISAO = W("decidimos|ficou decidido|decidiu-se|decidido|aprovado|aprovamos|fechado|combinado|vamos (?:com|usar|adotar|seguir|optar|contratar|lançar)|we decided|we agreed|agreed|approved|decision|the decision");
+  var RE_RISCO = W("risco|problema|bloqueio|bloqueado|atraso|atrasar|atrasado|preocupa\\p{L}*|dificuldade|impedimento|risk|blocker|blocked|delay|delayed|issue|concern");
+  var RE_PRAZO = W("hoje|amanhã|depois de amanhã|(?:dia|até) \\d{1,2}(?:/\\d{1,2})?|\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?|semana que vem|próxima semana|fim do mês|final do mês|fim da semana|até (?:" + DIAS + ")|(?:na |nesta |nessa |próxima |proxima )?(?:" + DIAS + ")|today|tomorrow|next week|end of (?:the )?(?:day|week|month)|by (?:" + DIAS + ")", "iu");
+
+  function csv(linhas, cols) {
+    var q = function (v) { v = v == null ? "" : String(v); return /[;"\n\r]/.test(v) ? "\"" + v.replace(/"/g, "\"\"") + "\"" : v; };
+    return "﻿" + [cols.map(function (c) { return q(c[1]); }).join(";")].concat(linhas.map(function (r) {
+      return cols.map(function (c) { return q(r[c[0]]); }).join(";");
+    })).join("\r\n") + "\r\n";
+  }
+  function limparTexto(s) {
+    s = s.replace(/(?<![\p{L}])(?:ã+h+m*|ahn+|hmm+|uhm+|hum+|éh+|uh+|erm+)(?![\p{L}])[,.]?\s*/giu, "")
+         .replace(/,?\s*(?<![\p{L}])né(?![\p{L}])\??/giu, "")
+         .replace(/(?<![\p{L}])([\p{L}]{1,12})(?:\s+\1)+(?![\p{L}])/giu, "$1")
+         .replace(/\s+/g, " ").replace(/\s+([,.!?])/g, "$1").trim();
+    if (!s) return "";
+    s = s.charAt(0).toUpperCase() + s.slice(1);
+    return /[.!?…]$/.test(s) ? s : s + ".";
+  }
+  function frases(t) { return t.split(/(?<=[.!?])\s+/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 2; }); }
+  function palavras(t) { return (t.toLowerCase().match(/[\p{L}][\p{L}'-]{3,}/gu) || []).filter(function (w) { return !STOPSET[w]; }); }
+  function topo(mapa, n) {
+    return Object.keys(mapa).map(function (k) { return [k, mapa[k]]; }).sort(function (a, b) { return b[1] - a[1] || (a[0] < b[0] ? -1 : 1); }).slice(0, n);
+  }
+  function nPal(t) { return t.split(/\s+/).filter(Boolean).length; }
+
+  // E — Extração: o texto bruto vira registros com início, fim, falante e marcações.
+  function etlExtrair(m) {
+    var ord = m.linhas.map(function (l, i) { return { l: l, i: i }; }).sort(function (a, b) { return a.l.t - b.l.t || a.i - b.i; }).map(function (x) { return x.l; });
+    var fala = ord.filter(function (l) { return l.k === "fala"; });
+    var segsE = fala.map(function (l, i) {
+      var prox = fala[i + 1], w = nPal(l.s), estim = w / 2.5 + 1, gap = prox ? prox.t - l.t : estim;
+      return { id: i + 1, inicio: +l.t.toFixed(1), fim: +(l.t + Math.max(1, Math.min(estim, gap > 0.5 ? gap : estim))).toFixed(1), falante: l.f || "Não identificado", texto_original: l.s, destaque: !!l.d, palavras: w };
+    });
+    return {
+      segmentos: segsE,
+      notas: ord.filter(function (l) { return l.k === "nota"; }).map(function (l) { return { t: l.t, texto: l.s }; }),
+      marcados: ord.filter(function (l) { return l.k === "dest"; }).map(function (l) { return l.t; })
+    };
+  }
+
+  // T — Transformação: limpeza, turnos, entidades, tarefas, decisões, resumo, capítulos e estatísticas.
+  function etlTransformar(m, ex) {
+    var segsT = [], ant = "";
+    ex.segmentos.forEach(function (sg) {
+      var c = limparTexto(sg.texto_original);
+      if (!c || c.toLowerCase() === ant) return;
+      ant = c.toLowerCase();
+      segsT.push({ id: sg.id, inicio: sg.inicio, fim: sg.fim, falante: sg.falante, texto: c, texto_original: sg.texto_original, destaque: sg.destaque, palavras: nPal(c) });
+    });
+    var turnos = [];
+    segsT.forEach(function (sg) {
+      var u = turnos[turnos.length - 1];
+      if (u && u.falante === sg.falante && sg.inicio - u.fim < 4) { u.texto += " " + sg.texto; u.fim = sg.fim; u.palavras += sg.palavras; u.destaque = u.destaque || sg.destaque; }
+      else turnos.push({ inicio: sg.inicio, fim: sg.fim, falante: sg.falante, texto: sg.texto, palavras: sg.palavras, destaque: sg.destaque });
+    });
+    var tudo = segsT.map(function (s) { return s.texto; }).join(" ");
+    var sents = [];
+    segsT.forEach(function (sg) { frases(sg.texto).forEach(function (f) { sents.push({ t: sg.inicio, falante: sg.falante, texto: f, destaque: sg.destaque }); }); });
+
+    // palavras-chave e termos compostos
+    var freq = {}, bi = {};
+    var toks = palavras(tudo);
+    toks.forEach(function (w, i) { freq[w] = (freq[w] || 0) + 1; if (i) { var b = toks[i - 1] + " " + w; bi[b] = (bi[b] || 0) + 1; } });
+    var chaves = topo(freq, 20).map(function (x) { return { termo: x[0], ocorrencias: x[1] }; });
+    var compostos = topo(bi, 10).filter(function (x) { return x[1] > 1; }).map(function (x) { return { termo: x[0], ocorrencias: x[1] }; });
+
+    // entidades
+    var ent = [], visto = {};
+    function add(tipo, valor, t) { var k = tipo + "|" + valor.toLowerCase(); if (!visto[k]) { visto[k] = { tipo: tipo, valor: valor, ocorrencias: 0, primeira_vez: t }; ent.push(visto[k]); } visto[k].ocorrencias++; }
+    var padroes = [
+      ["e-mail", /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g], ["link", /https?:\/\/[^\s)]+|www\.[^\s)]+/gi],
+      ["telefone", /(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-\s]?\d{4}/g],
+      ["valor", /(?:R\$|US\$|\$|€)\s?\d[\d.,]*(?:\s?(?:mil|milhões?|milhão|k|mi|bi))?|\d[\d.,]*\s?(?:reais|dólares|euros|dollars)/gi],
+      ["percentual", /\d+(?:[.,]\d+)?\s?(?:%|por cento|percent)/gi],
+      ["data", /\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b|(?<![\p{L}])dia \d{1,2}(?![\p{L}\p{N}\/])/giu],
+      ["hora", /\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?h(?:\s?\d{2})?\b/gi]
+    ];
+    segsT.forEach(function (sg) {
+      padroes.forEach(function (p) { (sg.texto.match(p[1]) || []).forEach(function (v) { add(p[0], v.trim(), sg.inicio); }); });
+      frases(sg.texto).forEach(function (f) {
+        var ws = f.replace(/[,;:"()]/g, " ").split(/\s+/).filter(Boolean), nome = [];
+        ws.forEach(function (w, i) {
+          var ok = i > 0 && /^\p{Lu}\p{Ll}{2,}$/u.test(w) && !STOPSET[w.toLowerCase()];
+          if (ok) nome.push(w); else { if (nome.length) add("nome", nome.join(" "), sg.inicio); nome = []; }
+        });
+        if (nome.length) add("nome", nome.join(" "), sg.inicio);
+      });
+    });
+    ent.sort(function (a, b) { return a.tipo < b.tipo ? -1 : a.tipo > b.tipo ? 1 : b.ocorrencias - a.ocorrencias; });
+
+    // tarefas, decisões, riscos, perguntas
+    function quais(re) { return sents.filter(function (x) { return re.test(x.texto); }); }
+    var tarefas = quais(RE_ACAO).map(function (x, i) {
+      var pr = x.texto.match(RE_PRAZO);
+      return { n: i + 1, tempo: hhmmss(x.t), responsavel: x.falante, acao: x.texto, prazo: pr ? pr[0] : "não definido", marcada: x.destaque ? "sim" : "não" };
+    });
+    var decisoes = quais(RE_DECISAO).map(function (x, i) { return { n: i + 1, tempo: hhmmss(x.t), falante: x.falante, decisao: x.texto }; });
+    var riscos = quais(RE_RISCO).map(function (x, i) { return { n: i + 1, tempo: hhmmss(x.t), falante: x.falante, trecho: x.texto }; });
+    var perguntas = sents.filter(function (x) { return /\?$/.test(x.texto) && nPal(x.texto) >= 3; }).map(function (x, i) { return { n: i + 1, tempo: hhmmss(x.t), falante: x.falante, pergunta: x.texto }; });
+
+    // resumo extrativo: frases com mais termos relevantes, mais bônus para ★, decisões e tarefas
+    var pontuadas = sents.map(function (x, i) {
+      var ps = palavras(x.texto), sc = ps.reduce(function (a, w) { return a + (freq[w] || 0); }, 0) / Math.sqrt(Math.max(ps.length, 1));
+      if (x.destaque) sc *= 1.6; if (RE_DECISAO.test(x.texto)) sc *= 1.4; if (RE_ACAO.test(x.texto)) sc *= 1.2;
+      if (nPal(x.texto) < 5) sc *= 0.3;
+      return { i: i, sc: sc, x: x };
+    }).sort(function (a, b) { return b.sc - a.sc; }).slice(0, Math.min(6, Math.max(2, Math.round(sents.length / 8)))).sort(function (a, b) { return a.i - b.i; });
+    var resumo = pontuadas.map(function (p) { return p.x.texto; });
+
+    // capítulos: a cada ~5 min ou pausa longa
+    var caps = [], cur0 = null;
+    turnos.forEach(function (u) {
+      if (!cur0 || u.inicio - cur0.inicio >= 300 || u.inicio - cur0.fim > 90) { cur0 = { inicio: u.inicio, fim: u.fim, textos: [], falantes: {} }; caps.push(cur0); }
+      cur0.fim = u.fim; cur0.textos.push(u.texto); cur0.falantes[u.falante] = 1;
+    });
+    var capitulos = caps.map(function (c, i) {
+      var f = {}; palavras(c.textos.join(" ")).forEach(function (w) { f[w] = (f[w] || 0) + 1; });
+      var primeira = frases(c.textos[0])[0] || "";
+      return { n: i + 1, inicio: hhmmss(c.inicio), fim: hhmmss(c.fim), temas: topo(f, 4).map(function (x) { return x[0]; }).join(", "), falantes: Object.keys(c.falantes).join(", "), abertura: primeira.length > 160 ? primeira.slice(0, 157) + "..." : primeira };
+    });
+
+    // estatísticas por falante e da reunião
+    var porF = {};
+    segsT.forEach(function (sg) { var f = porF[sg.falante] = porF[sg.falante] || { falante: sg.falante, segmentos: 0, palavras: 0, segundos: 0 }; f.segmentos++; f.palavras += sg.palavras; f.segundos += sg.fim - sg.inicio; });
+    var totalS = Object.keys(porF).reduce(function (a, k) { return a + porF[k].segundos; }, 0) || 1;
+    var falantes = Object.keys(porF).map(function (k) { var f = porF[k]; return { falante: f.falante, segmentos: f.segmentos, palavras: f.palavras, tempo_de_fala: hhmmss(f.segundos), participacao: Math.round(f.segundos / totalS * 100) + "%" }; })
+      .sort(function (a, b) { return b.palavras - a.palavras; });
+    var dur = Math.max(m.decorrido, segsT.length ? segsT[segsT.length - 1].fim : 0), totPal = segsT.reduce(function (a, s) { return a + s.palavras; }, 0);
+    var estat = {
+      duracao: hhmmss(dur), segmentos_brutos: ex.segmentos.length, segmentos_limpos: segsT.length, descartados_na_limpeza: ex.segmentos.length - segsT.length,
+      turnos: turnos.length, palavras: totPal, palavras_por_minuto: dur > 0 ? Math.round(totPal / (dur / 60)) : 0, frases: sents.length,
+      tarefas: tarefas.length, decisoes: decisoes.length, riscos: riscos.length, perguntas: perguntas.length, destaques: ex.marcados.length + segsT.filter(function (s) { return s.destaque; }).length, notas: ex.notas.length
+    };
+    return { segmentos: segsT, turnos: turnos, frases: sents, palavras_chave: chaves, termos_compostos: compostos, entidades: ent, tarefas: tarefas, decisoes: decisoes, riscos: riscos, perguntas: perguntas, resumo: resumo, capitulos: capitulos, falantes: falantes, estatisticas: estat };
+  }
+
+  function lista(itens, f) { return itens.length ? itens.map(f).join("\n") : "- (nada encontrado)"; }
+  function etlRelatorio(m, T, ex) {
+    var e = T.estatisticas;
+    return [
+      "# Relatório ETL: " + m.titulo, "",
+      "Data: " + new Date(m.criada).toLocaleDateString("pt-BR") + " · Duração: " + e.duracao + " · Palavras: " + e.palavras + " · Falantes: " + (T.falantes.map(function (f) { return f.falante; }).join(", ") || "nenhum"), "",
+      "> Gerado automaticamente por regras locais (sem IA). Confira os trechos; para uma ata redigida, use \"Copiar com instruções para o Claude\".", "",
+      "## Resumo automático", lista(T.resumo, function (x) { return "- " + x; }), "",
+      "## Decisões", lista(T.decisoes, function (x) { return "- [" + x.tempo + "] " + (x.falante !== "Não identificado" ? x.falante + ": " : "") + x.decisao; }), "",
+      "## Tarefas e próximos passos", lista(T.tarefas, function (x) { return "- [" + x.tempo + "] " + x.acao + " (responsável: " + x.responsavel + "; prazo: " + x.prazo + ")"; }), "",
+      "## Riscos e problemas citados", lista(T.riscos, function (x) { return "- [" + x.tempo + "] " + x.trecho; }), "",
+      "## Perguntas em aberto", lista(T.perguntas, function (x) { return "- [" + x.tempo + "] " + x.pergunta; }), "",
+      "## Capítulos", lista(T.capitulos, function (c) { return "- " + c.inicio + " a " + c.fim + ": " + (c.temas || "sem tema claro") + (c.abertura ? ". Começa com: \"" + c.abertura + "\"" : ""); }), "",
+      "## Palavras-chave", T.palavras_chave.map(function (k) { return k.termo + " (" + k.ocorrencias + ")"; }).join(", ") || "(nenhuma)", "",
+      "## Entidades (e-mails, links, valores, datas, horas, nomes)", lista(T.entidades.slice(0, 60), function (x) { return "- " + x.tipo + ": " + x.valor + " (" + x.ocorrencias + "x)"; }), "",
+      "## Participação", lista(T.falantes, function (f) { return "- " + f.falante + ": " + f.palavras + " palavras, " + f.tempo_de_fala + " de fala, " + f.participacao; }), "",
+      "## Momentos marcados e notas",
+      lista(ex.marcados.map(function (t) { return "- Momento marcado em " + hhmmss(t); }).concat(T.segmentos.filter(function (s) { return s.destaque; }).map(function (s) { return "- ★ [" + hhmmss(s.inicio) + "] " + s.texto; })).concat(ex.notas.map(function (n) { return "- Nota [" + hhmmss(n.t) + "]: " + n.texto; })), function (x) { return x; }), "",
+      "## Qualidade da carga",
+      "- Segmentos brutos: " + e.segmentos_brutos + " · após limpeza: " + e.segmentos_limpos + " · descartados (vazios/repetidos): " + e.descartados_na_limpeza,
+      "- Ritmo médio: " + e.palavras_por_minuto + " palavras por minuto"
+    ].join("\n") + "\n";
+  }
+  function etlBase(m, T) {
+    var partes = [], atual = null;
+    T.turnos.forEach(function (u) {
+      if (!atual || atual.pal >= 150) { atual = { ini: u.inicio, fim: u.fim, pal: 0, txt: [], f: {} }; partes.push(atual); }
+      atual.fim = u.fim; atual.pal += u.palavras; atual.txt.push((u.falante !== "Não identificado" ? u.falante + ": " : "") + u.texto); atual.f[u.falante] = 1;
+    });
+    var topos = T.palavras_chave.slice(0, 8).map(function (k) { return k.termo; }).join(", ");
+    return "---\ntitulo: " + m.titulo + "\ndata: " + new Date(m.criada).toISOString().slice(0, 10) + "\nduracao: " + T.estatisticas.duracao + "\ntemas: " + topos + "\ntipo: base-de-conhecimento-de-reuniao\n---\n\n# " + m.titulo + "\n\nResumo: " + (T.resumo.join(" ") || "(sem resumo)") + "\n\n" +
+      partes.map(function (p, i) {
+        return "## Trecho " + (i + 1) + " [" + hhmmss(p.ini) + " a " + hhmmss(p.fim) + "]\nFalantes: " + Object.keys(p.f).join(", ") + "\n\n" + p.txt.join("\n\n") + "\n";
+      }).join("\n");
+  }
+
+  // L — Carga: gera os arquivos (JSON, CSVs, Markdown, SRT, TXT) e empacota em .zip.
+  function etlArquivos(m, ex, T) {
+    var rel = etlRelatorio(m, T, ex), pref = "reuniao_" + new Date(m.criada).toISOString().slice(0, 10);
+    var json = { esquema: "reuniao-etl-v1", gerado_em: new Date().toISOString(), reuniao: { titulo: m.titulo, criada: new Date(m.criada).toISOString(), idioma: S.cfg.lang, fonte_audio: S.cfg.fonte, motor: S.cfg.motor }, extracao: ex, transformacao: T };
+    var f = [
+      { nome: pref + "/LEIAME.txt", texto: "Pacote ETL da reunião \"" + m.titulo + "\"\n\nrelatorio.md ........ resumo, decisões, tarefas, riscos, perguntas, capítulos\nbase-de-conhecimento.md  texto em trechos com metadados, pronto para colar em qualquer IA\nreuniao.json ....... tudo em um arquivo estruturado (extração + transformação)\ntranscricao.txt/.md  texto com horários e falantes\nlegendas.srt ....... legendas com tempo\ncsv/*.csv .......... planilhas (separador ponto e vírgula, abre no Excel)\n\nA limpeza remove vícios de fala e repetições; o texto original fica em segmentos.csv (texto_original).\n" },
+      { nome: pref + "/relatorio.md", texto: rel },
+      { nome: pref + "/base-de-conhecimento.md", texto: etlBase(m, T) },
+      { nome: pref + "/reuniao.json", texto: JSON.stringify(json, null, 2) },
+      { nome: pref + "/transcricao.txt", texto: cabecalho(m) + "\n\n" + textoPuro(m) + "\n" },
+      { nome: pref + "/transcricao.md", texto: markdown(m) },
+      { nome: pref + "/legendas.srt", texto: srt(m) },
+      { nome: pref + "/csv/segmentos.csv", texto: csv(T.segmentos, [["id", "id"], ["inicio", "inicio_s"], ["fim", "fim_s"], ["falante", "falante"], ["texto", "texto"], ["texto_original", "texto_original"], ["destaque", "destaque"], ["palavras", "palavras"]]) },
+      { nome: pref + "/csv/tarefas.csv", texto: csv(T.tarefas, [["n", "n"], ["tempo", "tempo"], ["responsavel", "responsavel"], ["acao", "acao"], ["prazo", "prazo"], ["marcada", "marcada_com_estrela"]]) },
+      { nome: pref + "/csv/decisoes.csv", texto: csv(T.decisoes, [["n", "n"], ["tempo", "tempo"], ["falante", "falante"], ["decisao", "decisao"]]) },
+      { nome: pref + "/csv/riscos.csv", texto: csv(T.riscos, [["n", "n"], ["tempo", "tempo"], ["falante", "falante"], ["trecho", "trecho"]]) },
+      { nome: pref + "/csv/perguntas.csv", texto: csv(T.perguntas, [["n", "n"], ["tempo", "tempo"], ["falante", "falante"], ["pergunta", "pergunta"]]) },
+      { nome: pref + "/csv/entidades.csv", texto: csv(T.entidades, [["tipo", "tipo"], ["valor", "valor"], ["ocorrencias", "ocorrencias"], ["primeira_vez", "primeira_vez_s"]]) },
+      { nome: pref + "/csv/palavras-chave.csv", texto: csv(T.palavras_chave.concat(T.termos_compostos), [["termo", "termo"], ["ocorrencias", "ocorrencias"]]) },
+      { nome: pref + "/csv/capitulos.csv", texto: csv(T.capitulos, [["n", "n"], ["inicio", "inicio"], ["fim", "fim"], ["temas", "temas"], ["falantes", "falantes"], ["abertura", "abertura"]]) },
+      { nome: pref + "/csv/falantes.csv", texto: csv(T.falantes, [["falante", "falante"], ["segmentos", "segmentos"], ["palavras", "palavras"], ["tempo_de_fala", "tempo_de_fala"], ["participacao", "participacao"]]) }
+    ];
+    return { arquivos: f, relatorio: rel, json: json, pasta: pref };
+  }
+
+  var CRCT = (function () { var t = [], c, n, k; for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRCT[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zipar(arquivos) {
+    var enc = new TextEncoder(), partes = [], central = [], off = 0, tamC = 0;
+    arquivos.forEach(function (a) {
+      var nome = enc.encode(a.nome), dados = enc.encode(a.texto), crc = crc32(dados);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(12, 0x21, true);
+      h.setUint32(14, crc, true); h.setUint32(18, dados.length, true); h.setUint32(22, dados.length, true); h.setUint16(26, nome.length, true);
+      partes.push(new Uint8Array(h.buffer), nome, dados);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(14, 0x21, true);
+      c.setUint32(16, crc, true); c.setUint32(20, dados.length, true); c.setUint32(24, dados.length, true); c.setUint16(28, nome.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), nome);
+      off += 30 + nome.length + dados.length; tamC += 46 + nome.length;
+    });
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, arquivos.length, true); e.setUint16(10, arquivos.length, true); e.setUint32(12, tamC, true); e.setUint32(16, off, true);
+    return new Blob(partes.concat(central, [new Uint8Array(e.buffer)]), { type: "application/zip" });
+  }
+  function baixarBlob(blob, nome) {
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+  }
+
+  var etlAtual = null;   // { id, nLinhas, rel, json, arquivos, pasta }
+  function rodarEtl(auto) {
+    var m = cur();
+    if (!m.linhas.some(function (l) { return l.k === "fala"; })) { if (!auto) aviso("Ainda não há falas para processar.", "atencao"); return; }
+    try {
+      var ex = etlExtrair(m), T = etlTransformar(m, ex), saida = etlArquivos(m, ex, T);
+      etlAtual = { id: m.id, nLinhas: m.linhas.length, rel: saida.relatorio, json: saida.json, arquivos: saida.arquivos, pasta: saida.pasta, quando: Date.now(), est: T.estatisticas };
+      m.etl = { nLinhas: m.linhas.length, quando: etlAtual.quando, relatorio: saida.relatorio };
+      salvar(); desenharEtl();
+      aviso("ETL concluído: " + saida.arquivos.length + " arquivos prontos. Baixe o pacote .zip.", "ok");
+    } catch (e) { aviso("Falha no ETL: " + (e && e.message ? e.message : e), "erro"); }
+  }
+  function desenharEtl() {
+    var m = cur(), box = $("etlSaida"), r = (etlAtual && etlAtual.id === m.id) ? etlAtual.rel : (m.etl ? m.etl.relatorio : "");
+    var velho = m.etl && m.etl.nLinhas !== m.linhas.length;
+    var chave = m.id + "|" + (m.etl ? m.etl.quando : 0) + "|" + !!velho;
+    if (box.dataset.chave === chave) return;
+    box.dataset.chave = chave;
+    box.textContent = r ? (velho ? "ATENÇÃO: o texto mudou depois deste ETL. Rode de novo.\n\n" : "") + r : "Ainda não rodou. Ele roda sozinho quando você para a transcrição.";
+    var tem = !!r; ["btnEtlZip", "btnEtlJson", "btnEtlCopiar"].forEach(function (id) { $(id).disabled = !tem; });
+  }
+  function garantirEtl() {
+    var m = cur();
+    if (!etlAtual || etlAtual.id !== m.id || etlAtual.nLinhas !== m.linhas.length) rodarEtl(false);
+    return etlAtual && etlAtual.id === m.id;
+  }
+  $("btnEtl").addEventListener("click", function () { if (rodando) { aviso("Pare a transcrição para rodar o ETL completo.", "atencao"); return; } rodarEtl(false); });
+  $("btnEtlZip").addEventListener("click", function () { if (garantirEtl()) { baixarBlob(zipar(etlAtual.arquivos), etlAtual.pasta + ".zip"); aviso("Pacote " + etlAtual.pasta + ".zip gerado.", "ok"); } });
+  $("btnEtlJson").addEventListener("click", function () { if (garantirEtl()) { baixarBlob(new Blob([JSON.stringify(etlAtual.json, null, 2)], { type: "application/json" }), etlAtual.pasta + ".json"); aviso("JSON gerado.", "ok"); } });
+  $("btnEtlCopiar").addEventListener("click", function () { if (garantirEtl()) copiar(etlAtual.rel, "Relatório copiado."); });
 
   /* ---------- Apagar texto ---------- */
   $("btnLimpar").addEventListener("click", function () { if (rodando) { aviso("Pare a transcrição antes de limpar.", "atencao"); return; } $("confirma").hidden = false; });
