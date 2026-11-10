@@ -135,6 +135,10 @@ def main():
         ls.sort(key=lambda l: l["t"]); cr = datetime.fromtimestamp(jl.stat().st_ctime)
         d, z, rel, est = etl.rodar_etl(a.titulo or f"Reunião recuperada {cr:%d/%m %H:%M}", cr, ls, ls[-1]["t"] + 5, "inglês" if a.idioma == "en" else "português do Brasil", "recuperada", pr / "reuniao_recuperada", a.curso)
         print(f"ETL concluído: {est['palavras']} palavras.\nPasta: {d}\nPacote: {z}"); return
+    import fcntl                                   # só uma transcrição por vez (duas disputam a CPU e duplicam o texto)
+    trava = open("/tmp/transcritor-reuniao.lock", "w")
+    try: fcntl.flock(trava, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError: sys.exit("Já existe uma transcrição em andamento. Pare a outra (Ctrl+C na janela dela) antes de abrir esta.")
     criada = datetime.now()
     titulo = a.titulo or (f"Curso {criada:%d/%m %H:%M}" if a.curso else f"Reunião {criada:%d/%m %H:%M}")
     pasta = RAIZ / "reunioes" / f"reuniao_{criada:%Y-%m-%d_%H%M}"
@@ -151,7 +155,8 @@ def main():
 
     print(f"Carregando o modelo de voz '{a.modelo}' (só na primeira vez demora)...", flush=True)
     from faster_whisper import WhisperModel
-    modelo = WhisperModel(a.modelo, device="cpu", compute_type="int8", cpu_threads=4)
+    ORDEM = ["medium", "small", "base", "tiny"]
+    atual = {"nome": a.modelo, "m": WhisperModel(a.modelo, device="cpu", compute_type="int8", cpu_threads=4), "atrasos": 0}
     lang = None if a.idioma == "auto" else a.idioma
 
     parar = threading.Event(); fila = queue.Queue(); t0 = time.monotonic()
@@ -183,9 +188,15 @@ def main():
             except queue.Empty:
                 if parar.is_set() and fila.empty(): return
                 continue
-            if fila.qsize() > 3 and a.modelo != "tiny": print("   (atrasado: use --modelo tiny para acompanhar melhor)", flush=True)
+            atual["atrasos"] = atual["atrasos"] + 1 if fila.qsize() > 2 else 0
+            if atual["atrasos"] >= 3 and atual["nome"] in ORDEM and atual["nome"] != "tiny":
+                for novo in ORDEM[ORDEM.index(atual["nome"]) + 1:]:      # atrasou: desce para um modelo mais leve
+                    try:
+                        atual.update(nome=novo, m=WhisperModel(novo, device="cpu", compute_type="int8", cpu_threads=4), atrasos=0)
+                        print(f"   (computador sobrecarregado: trocando para o modelo mais leve '{novo}' para acompanhar ao vivo)", flush=True); break
+                    except Exception: continue
             try:
-                trechos, _ = modelo.transcribe(audio, language=lang, beam_size=1, vad_filter=True, condition_on_previous_text=False, initial_prompt=dica)
+                trechos, _ = atual["m"].transcribe(audio, language=lang, beam_size=1, vad_filter=True, condition_on_previous_text=False, initial_prompt=dica)
                 txt = " ".join(t.text.strip() for t in trechos).strip()
             except Exception as e:
                 print(f"   (falha ao transcrever um trecho: {e})", flush=True); continue
