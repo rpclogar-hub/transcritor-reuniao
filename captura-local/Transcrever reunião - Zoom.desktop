@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Transcrever reunião - Zoom
-Exec=bash -c 'cd "/home/rpc/Claude/@.artifacts/plaud-note-online-transcricao-de-audio/captura-local" && ./iniciar.sh --app zoom; echo; read -p "Enter para fechar"'
+Exec=/home/rpc/Claude/@.artifacts/plaud-note-online-transcricao-de-audio/captura-local/abrir-zoom.sh
+Path=/home/rpc/Claude/@.artifacts/plaud-note-online-transcricao-de-audio/captura-local
 Terminal=true
 Icon=audio-input-microphone
